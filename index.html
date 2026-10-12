@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fourier Optics for Training 02 — Optical Backpropagation and In-Situ Training</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&family=Geist+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1c1815;
+            --bg-card: #231e1a;
+            --bg-code: #2b2520;
+            --text-primary: #efe8dc;
+            --text-secondary: #a2978b;
+            --accent: #aabd59;
+            --accent-dim: #aabd5944;
+            --accent-glow: #aabd5933;
+            --border: #3a322b;
+            --font-display: 'Bricolage Grotesque', sans-serif;
+            --font-mono: 'Geist Mono', 'Geist Mono', monospace;
+            --font-body: 'Instrument Sans', sans-serif;
+            --max-width: 900px;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 17px;
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        /* ── Header ── */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .hero > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .series-label {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 .accent {
+            color: var(--accent);
+        }
+
+        .hero .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin-bottom: 2rem;
+        }
+
+        /* ── Tag Pills ── */
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .tag {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            background: var(--accent-dim);
+            white-space: nowrap;
+        }
+
+        /* ── Pipeline Flow Bar ── */
+        .pipeline {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            margin-bottom: 1rem;
+            max-width: var(--max-width);
+        }
+
+        .pipeline-step {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.3rem 0.7rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .pipeline-arrow {
+            color: var(--accent);
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        /* ── Slides ── */
+        .slide {
+            min-height: 100vh;
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 4rem 1.5rem;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .slide-number {
+            font-family: var(--font-display);
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--accent-dim);
+            position: absolute;
+            top: 2rem;
+            right: 1.5rem;
+            line-height: 1;
+            user-select: none;
+        }
+
+        .slide h2 {
+            font-family: var(--font-display);
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            line-height: 1.25;
+        }
+
+        .slide h3 {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .slide p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .slide p strong {
+            color: var(--text-primary);
+        }
+
+        .slide ul, .slide ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        .slide li {
+            margin-bottom: 0.4rem;
+        }
+
+        .slide li strong {
+            color: var(--text-primary);
+        }
+
+        /* ── Code Blocks ── */
+        .code-block {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1.25rem 0;
+            overflow: hidden;
+        }
+
+        .code-header {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            background: rgba(170,189,89,0.08);
+            padding: 0.4rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .code-block pre {
+            margin: 0;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #dad1c5;
+        }
+
+        /* Syntax highlighting (manual) */
+        .kw { color: #de805a; }
+        .fn { color: #d7bbdf; }
+        .str { color: #bcdbd4; }
+        .cm { color: #a2978b; font-style: italic; }
+        .num { color: #97cdc6; }
+        .type { color: #e3b174; }
+        .dir { color: #de805a; }
+        .mac { color: #e3b174; }
+
+        /* ── Tables ── */
+        .table-wrap {
+            overflow-x: auto;
+            margin: 1.25rem 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: var(--bg-code);
+            color: var(--accent);
+            font-weight: 600;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--font-display);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:nth-child(even) td {
+            background: rgba(35,30,26,0.5);
+        }
+
+        /* ── Diagrams ── */
+        .diagram-flow {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .diagram-box {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .diagram-box.accent {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(170,189,89,0.08);
+        }
+
+        .diagram-box.dim {
+            color: var(--text-secondary);
+            border-color: var(--border);
+        }
+
+        .diagram-arrow {
+            color: var(--accent);
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        /* Vertical flow diagrams */
+        .diagram-vertical {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .diagram-vertical .diagram-arrow {
+            font-size: 1.1rem;
+        }
+
+        /* Nested hierarchy diagram */
+        .hierarchy {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .hierarchy-level {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .hierarchy-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .hierarchy-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+
+        .hierarchy-item {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .hierarchy-item.accent {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(170,189,89,0.08);
+        }
+
+        /* Grid diagram */
+        .diagram-grid {
+            display: grid;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .diagram-grid.cols-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .diagram-grid.cols-3 {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .diagram-panel {
+            padding: 1rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+
+        .diagram-panel.accent-border {
+            border-left: 3px solid var(--accent);
+        }
+
+        .diagram-panel h4 {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .diagram-panel p, .diagram-panel ul {
+            font-size: 0.85rem;
+        }
+
+        /* ── Callout Boxes ── */
+        .callout {
+            background: var(--bg-card);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 1rem 1.25rem;
+            margin: 1.25rem 0;
+        }
+
+        .callout p {
+            margin-bottom: 0;
+        }
+
+        .callout .callout-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.3rem;
+        }
+
+        /* ── Tier Visual ── */
+        .tier-visual {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .tier-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .tier-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            min-width: 90px;
+            text-align: right;
+        }
+
+        .tier-fill {
+            height: 32px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            padding: 0 0.75rem;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            white-space: nowrap;
+            transition: width 0.6s ease;
+        }
+
+        .tier-cost {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            min-width: 70px;
+        }
+
+        /* ── Contents list ── */
+        .contents-list {
+            list-style: none;
+            padding-left: 0;
+            counter-reset: contents;
+        }
+
+        .contents-list li {
+            counter-increment: contents;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .contents-list li:last-child {
+            border-bottom: none;
+        }
+
+        .contents-list li::before {
+            content: counter(contents, decimal-leading-zero);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            min-width: 2rem;
+        }
+
+        .contents-list a {
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .contents-list a:hover {
+            color: var(--accent);
+        }
+
+        /* ── Footer ── */
+        .footer {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            max-width: var(--max-width);
+            margin: 0 auto;
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 640px) {
+            .slide {
+                padding: 3rem 1rem;
+                min-height: auto;
+            }
+
+            .slide-number {
+                font-size: 3rem;
+                top: 1.5rem;
+                right: 1rem;
+            }
+
+            .slide h2 {
+                font-size: 1.5rem;
+            }
+
+            .diagram-grid.cols-2,
+            .diagram-grid.cols-3 {
+                grid-template-columns: 1fr;
+            }
+
+            .pipeline {
+                gap: 0.15rem;
+            }
+
+            .pipeline-step {
+                font-size: 0.6rem;
+                padding: 0.2rem 0.4rem;
+            }
+
+            .hero h1 {
+                font-size: 1.8rem;
+            }
+
+            table {
+                font-size: 0.78rem;
+            }
+
+            .tier-label {
+                min-width: 60px;
+                font-size: 0.65rem;
+            }
+
+            .tier-fill {
+                font-size: 0.6rem;
+                height: 26px;
+            }
+        }
+
+        /* ── Interactive controls (added for Local LLM series) ── */
+        .control-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin: 1.25rem 0;
+        }
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .control-row label {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            min-width: 180px;
+        }
+        .control-row input[type="range"] {
+            flex: 1;
+            min-width: 160px;
+            accent-color: var(--accent);
+        }
+        .control-row input[type="number"],
+        .control-row select {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            border-radius: 4px;
+            padding: 0.3rem 0.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+        .control-row .val {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+            min-width: 80px;
+            text-align: right;
+        }
+        .btn {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            padding: 0.4rem 0.9rem;
+            background: var(--accent-dim);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .btn:hover { background: rgba(170,189,89,0.2); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn.secondary {
+            background: var(--bg-code);
+            color: var(--text-secondary);
+            border-color: var(--border);
+        }
+        .result-box {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 4px;
+            padding: 0.75rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            margin-top: 0.75rem;
+        }
+        .result-box .line-label { color: var(--text-secondary); }
+        .result-box .line-val   { color: var(--accent); font-weight: 600; }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+        .metric {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            text-align: center;
+        }
+        .metric .metric-label {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .metric .metric-value {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            color: var(--accent);
+            font-weight: 600;
+            margin-top: 0.2rem;
+        }
+
+        /* Canvas / SVG containers */
+        .canvas-wrap {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1.25rem 0;
+            overflow-x: auto;
+        }
+        .canvas-wrap canvas,
+        .canvas-wrap svg {
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+        }
+
+        /* Small inline badge */
+        .badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            padding: 0.1rem 0.45rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            vertical-align: middle;
+            margin-left: 0.3rem;
+        }
+        .badge.ok    { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+        .badge.warn  { border-color: #e3b174; color: #e3b174; background: rgba(227,177,116,0.08); }
+        .badge.bad   { border-color: #de805a; color: #de805a; background: rgba(222,128,90,0.08); }
+
+
+        /* ── LLM Inference Simulators additions ── */
+        .canvas-wrap canvas { image-rendering: auto; display: block; width: 100%; height: auto; }
+        .canvas-wrap svg { max-width: 100%; height: auto; }
+        .ladder { display: grid; gap: 0.4rem; margin: 1.25rem 0; }
+        .ladder-row {
+            display: grid; grid-template-columns: 11rem 1fr 7.5rem; gap: 0.75rem; align-items: center;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+            padding: 0.55rem 0.85rem; font-size: 0.88rem;
+        }
+        .ladder-row .rung { font-family: var(--font-display); font-weight: 600; color: var(--accent); }
+        .ladder-row .speed { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary); text-align: right; }
+        .res-list { list-style: none; padding: 0; margin: 0.75rem 0; }
+        .res-list li { padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.92rem; }
+        .res-list li:last-child { border-bottom: none; }
+        .res-list .what { color: var(--text-secondary); display: block; font-size: 0.86rem; margin-top: 0.15rem; }
+        .res-list a { color: var(--accent); text-decoration: none; }
+        .res-list a:hover { text-decoration: underline; }
+        .qa { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; margin: 0.6rem 0; padding: 0.2rem 1rem; }
+        .qa summary { cursor: pointer; padding: 0.6rem 0; font-weight: 600; }
+        .qa p, .qa ul { margin-bottom: 0.75rem; font-size: 0.92rem; }
+        .sim-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.4rem 1.25rem; }
+        .chart-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+        .chart-title { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem; }
+        .slide a { color: var(--accent); }
+        @media (max-width: 640px) {
+            .ladder-row { grid-template-columns: 1fr; gap: 0.2rem; }
+            .ladder-row .speed { text-align: left; }
+        }
+        .concepts { background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 0.75rem 1rem; margin-top: 1.25rem; font-size: 0.88rem; }
+        .concepts p { margin: 0 0 0.4rem; color: var(--text-secondary); }
+        .concepts .chips { display: flex; flex-wrap: wrap; gap: 0.35rem 0.5rem; }
+        .concepts .chips a { border: 1px solid var(--border); border-radius: 999px; padding: 0.1rem 0.6rem; text-decoration: none; font-size: 0.82rem; }
+        .concepts .chips a:hover { border-color: var(--accent); }
+        .hero { overflow: hidden; }   /* the 600px glow must not widen the page on phones */
+        .chart-pair > *, .diagram-grid > *, .sim-grid > * { min-width: 0; }   /* let wide code scroll inside its column */
+        .slide p code, .slide li code, .slide td code { overflow-wrap: anywhere; }
+        @media (max-width: 640px) { .diagram-box { white-space: normal; max-width: 100%; } }   /* long boxes must wrap on phones */
+        /* FOptInf: keep long titles clear of the slide number on phones */
+        @media (max-width: 640px) { .slide h2 { padding-right: 3.6rem; } }
+        .sim-grid select, .sim-grid input[type="range"] { max-width: 100%; min-width: 0; }   /* long option labels must not spill into the next column */
+        /* ── FOptTrn 02: trainer demo legend ── */
+        .tr-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); }
+        .tr-legend i { display: inline-block; width: 1.2rem; height: 3px; vertical-align: middle; margin-right: 0.35rem; }
+        .tr-legend i.dash { background: none; border-top: 2px dashed var(--text-secondary); height: 0; }
+        .d-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); }
+        .src { font-size: 0.82rem; }
+        #slide-11 .sim-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); }
+        #slide-11 .control-row label { min-width: 9.5rem; }
+        #slide-11 .control-row .val { min-width: 3.5rem; }
+        #slide-11 .control-row input[type="range"] { min-width: 120px; }
+        @media (max-width: 640px) {
+            #slide-11 .control-row { gap: 0.2rem 0.75rem; }
+            #slide-11 .control-row label { flex-basis: 100%; }
+        }
+        .hero { overflow: hidden; }   /* the 600px glow must not widen the page on phones */
+    </style>
+</head>
+<body>
+
+<header class="hero">
+    <div class="series-label">Fourier Optics for Training &mdash; Presentation 02</div>
+    <h1>Optical <span class="accent">Backpropagation</span> and In-Situ Training</h1>
+    <p class="subtitle">The question turned around: how is optical hardware itself trained, and what does that teach about putting optics in an LLM training loop? In-silico training and the reality gap, the adjoint method, physics-aware training, direct feedback alignment, forward-only methods, analogue noise, the ADC precision a training format asks for, and a live experiment that trains one distorted filter three ways.</p>
+
+    <div class="tags">
+        <span class="tag">Reality gap</span>
+        <span class="tag">Adjoint method</span>
+        <span class="tag">Physics-aware training</span>
+        <span class="tag">DFA</span>
+        <span class="tag">Forward-only</span>
+        <span class="tag">FP8 gradients</span>
+    </div>
+
+    <div class="pipeline">
+        <span class="pipeline-step">Physical parameters</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Forward on hardware</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Gradient: measured or modelled</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Update</span>
+        <span class="pipeline-arrow">&rarr;</span>
+        <span class="pipeline-step">Calibrated engine</span>
+    </div>
+</header>
+
+<section class="slide" id="slide-00">
+    <div class="slide-number">00</div>
+    <h2>Topics We'll Cover</h2>
+    <ul class="contents-list">
+        <li><a href="#slide-01">The Question, Turned Around</a></li>
+        <li><a href="#slide-02">Why Training Optics Differs from Training Digital</a></li>
+        <li><a href="#slide-03">In-Silico Training and the Reality Gap</a></li>
+        <li><a href="#slide-04">The Adjoint Method: Gradients by Interference</a></li>
+        <li><a href="#slide-05">In-Situ Backpropagation, Demonstrated</a></li>
+        <li><a href="#slide-06">Physics-Aware Training</a></li>
+        <li><a href="#slide-07">Direct Feedback Alignment and the Optical Random Projection</a></li>
+        <li><a href="#slide-08">Backprop-Free and Forward-Only Training</a></li>
+        <li><a href="#slide-09">Analogue Noise in a Training Loop</a></li>
+        <li><a href="#slide-10">Precision for Training Formats</a></li>
+        <li><a href="#slide-11">Interactive: Three Trainers, One Distorted Filter</a></li>
+        <li><a href="#slide-12">The Methods Compared</a></li>
+        <li><a href="#slide-13">What Maps onto an LLM-Scale Transform Engine</a></li>
+        <li><a href="#slide-14">What to Take Away</a></li>
+    </ul>
+    <div class="concepts">
+        <p><strong>Concepts used here, and where they are explained.</strong> Each links to a glossary entry: this <a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#glossary">series glossary</a>, or the <a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#glossary">Fourier Optics for Inference glossary</a> for the physics and precision concepts that series already explains.</p>
+        <div class="chips"><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-mzimesh" title="A triangular (Reck) or rectangular (Clements) grid of MZIs implements any N×N unitary, including the DFT, on a chip: N(N−1)/2 MZIs, each with a phase shifter that must be calibrated and held.">Mach–Zehnder interferometer (MZI) meshes</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-convthm" title="A convolution in one domain is a pointwise product in the other: F{h ∗ u} = F{h}·F{u}. A 4f system uses it optically (mask = filter spectrum); FFT convolution uses it digitally in O(n log n).">The convolution theorem</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-slm" title="A pixelated device that writes values into a light field. Liquid-crystal SLMs modulate phase or amplitude and settle in tens of milliseconds; a 2-megapixel digital micromirror device switches amplitude at about 1 kHz with 8-bit depth (20 kHz binary). Pixel count and frame rate bound how fast inputs and Fourier-plane masks can change.">Spatial light modulator (SLM)</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-phaseproblem" title="Photodetectors measure intensity |E|², losing the sign and phase of the field. Remedies: interfere with a reference beam (coherent detection), add a bias so the field stays positive, split positive and negative parts into two passes, or recover phase iteratively (phase retrieval).">Square-law detection and the phase problem</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-d2nn" title="Stacks of passive diffractive layers whose transmission is trained in simulation and then fabricated (Lin et al., Science 2018). Training is entirely digital; the optics only runs inference, so model mismatch after fabrication is the central problem.">Diffractive deep neural networks (D²NN)</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-realitygap" title="The difference between the model a network was trained on and the hardware it runs on: fabrication error, drift, crosstalk, temperature. In-situ and hardware-in-the-loop training close it; in-silico training does not.">The reality gap</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-adjoint" title="In a reciprocal photonic circuit, the gradient with respect to every phase shifter can be measured by sending the error signal backwards and interfering it with the stored forward field (Hughes et al., Optica 2018; demonstrated in a programmable photonic chip by Pai et al., Science 2023). The hardware computes its own gradient.">In-situ backpropagation (the adjoint method)</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-pat" title="Run the forward pass on the physical system and the backward pass through a differentiable digital model of it, so the update uses the real output but an approximate gradient (Wright et al., Nature 2022). It tolerates mismatch that pure in-silico training does not.">Physics-aware training</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-dfa" title="Replace each layer&#x27;s backpropagated error with a fixed random projection of the output error. The random projection is a large matrix multiply an optical scattering medium does for free; a photonic co-processor has trained networks this way (Launay et al., 2020). It scales poorly to transformers&#x27; accuracy.">Direct feedback alignment (DFA)</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-noisereg" title="Zero-mean read-out noise in the forward pass acts like injected noise, which training can tolerate or even exploit; noise in the gradient adds to minibatch noise. Biased errors (offset, nonlinearity, drift) do not average out and must be calibrated.">Analogue noise in a training loop</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-averaging" title="Repeating an analogue operation k times and averaging cuts random noise by √k, buying ½ log2 k bits: one extra bit costs four times the passes. Digit planes, which make FHE exact, do not help a float workload.">Dynamic precision by repeated passes</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-gradprecision" title="Training keeps activations and weights in BF16 or FP8 E4M3 and gradients in FP8 E5M2, which trades mantissa for range. Applying the inference series&#x27; noise rule, matching E5M2 needs about 5.3–5.8 ENOB and BF16 about 10.3–10.7, higher for spiky gradients whose crest factor is larger.">Gradient precision and FP8 E5M2</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-floatenob" title="For float workloads the analogue chain must match the number format&#x27;s own rounding error, not be exact. Relative RMS error = crest × 2−ENOB × 2/√12; matching BF16 needs about 10.3 ENOB, INT8 8.0, FP8 E4M3 6.3. FHE&#x27;s exact-rounding rule does not transfer to long convolutions.">The noise rule for floating-point workloads</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-crest" title="The ratio of a signal&#x27;s peak to its RMS value. An ADC&#x27;s full scale must cover the peak, so a high crest factor wastes resolution on the rare large values: the noise rule&#x27;s error scales with it.">Crest factor</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-corr" title="For y = h ∗ u, the input gradient is G correlated with h, IFFT(G·conj(H)), and the filter gradient is G correlated with u, IFFT(G·conj(U)). A backward long convolution is one more FFT and two more Fourier-domain products than the forward; the analysis checks the formulas against direct sums and finite differences.">The gradient of a convolution is a correlation</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-masked" title="A Fourier-domain product whose second operand is a weight spectrum (forward H, backward conj(H)) can be a mask written once per optimizer step. One whose operands both depend on the sample (conj(U)·G for the weight gradient) needs a new mask for every sequence, and in practice stays digital.">Weight-masked and data-by-data products</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-maskrewrite" title="An inference engine writes its filter spectra once; a training engine must rewrite them after every optimizer step, for the forward and the backward pass. Processing the whole step layer by layer amortises each write over every sequence, but the frame budget still rivals the digital step time.">Mask rewrites per optimizer step</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-transformengine" title="An optical MAC accelerates every matrix multiply (the simulator&#x27;s hypothetical optical part); a Fourier transform engine accelerates only FFT and convolution work and leaves matmuls to a digital part.">Transform engine against optical MAC</a></div>
+    </div>
+</section>
+
+<section class="slide" id="slide-01">
+    <div class="slide-number">01</div>
+    <h2>The Question, Turned Around</h2>
+    <p><a href="https://brendanjameslynskey.github.io/FOptTrn_01_Transforms_in_Training/">Deck 01</a> asked whether a Fourier-optical engine could take over part of an LLM training step, and found the share small: 0.15% of a step for a Hyena-2 model at 4,096 tokens, 12.19% with block-circulant weights (<a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Fourier_Optics_Training/blob/main/analysis/results.md">results.md &sect;2</a>). In that picture the LLM's weights live in digital memory, the optimizer is digital, and the engine computes fixed transforms on values it is handed.</p>
+    <p>This deck asks the other question. The optics has parameters of its own: phase shifters in a mesh, pixels on a mask, the alignment of a lens. How are <em>they</em> set, when no digital model of the hardware is exact? Photonic-computing research has answered this in several ways, each with a different answer to &ldquo;who computes the gradient&rdquo;:</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Approach</th><th>Who computes the gradient</th><th>Slides</th></tr>
+        <tr><td><strong>In-silico</strong></td><td>A digital model, before the hardware exists</td><td><a href="#slide-03">03</a></td></tr>
+        <tr><td><strong>In-situ backpropagation</strong></td><td>The hardware, by interfering forward and adjoint fields</td><td><a href="#slide-04">04</a>&ndash;<a href="#slide-05">05</a></td></tr>
+        <tr><td><strong>Physics-aware training</strong></td><td>A digital twin, fed the hardware's real outputs</td><td><a href="#slide-06">06</a></td></tr>
+        <tr><td><strong>Direct feedback alignment</strong></td><td>A fixed random projection of the error (done optically)</td><td><a href="#slide-07">07</a></td></tr>
+        <tr><td><strong>Forward-only methods</strong></td><td>The hardware, from forward passes alone</td><td><a href="#slide-08">08</a></td></tr>
+    </table>
+    </div>
+    <p>The lesson for an LLM engine comes at the end (<a href="#slide-13">slide 13</a>): these methods matter for <strong>calibrating the engine's own parameters</strong>, not for training the LLM. The physics of meshes, SLMs and detectors is in <a href="https://brendanjameslynskey.github.io/FOptInf_01_Fourier_Optics_for_Engineers/">FOptInf 01</a> and is not repeated here.</p>
+</section>
+
+<section class="slide" id="slide-02">
+    <div class="slide-number">02</div>
+    <h2>Why Training Optics Differs from Training Digital</h2>
+    <p>Backpropagation on a GPU rests on three assumptions that optical hardware breaks: the forward function is known exactly, every intermediate value can be stored and read back, and a weight can be written to the precision the optimizer asks for.</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th></th><th>Digital training</th><th>Training optical parameters</th></tr>
+        <tr><td><strong>Forward function</strong></td><td>Exactly the code</td><td>A physical process: fabrication error, crosstalk, loss, temperature drift. A model of it is approximate</td></tr>
+        <tr><td><strong>Intermediate values</strong></td><td>Stored activations, read back for the backward pass</td><td>Fields inside a mesh or at a Fourier plane, visible only through detectors that measure intensity, not phase (<a href="https://brendanjameslynskey.github.io/FOptInf_01_Fourier_Optics_for_Engineers/#slide-07">the phase problem</a>)</td></tr>
+        <tr><td><strong>Gradient</strong></td><td>Computed by the chain rule</td><td>Must be <em>measured</em> on the hardware, <em>modelled</em> by a twin, or <em>avoided</em></td></tr>
+        <tr><td><strong>Parameter writes</strong></td><td>Any float, any time</td><td>A heater current or SLM pixel with finite resolution and settling time</td></tr>
+        <tr><td><strong>Read-out</strong></td><td>Exact to the number format</td><td>An ADC at finite ENOB, plus noise</td></tr>
+    </table>
+    </div>
+    <p>Two kinds of error result, and they behave differently in training. <strong>Systematic</strong> error (the model is wrong) biases every gradient the same way; <strong>random</strong> error (read-out noise) mostly averages out over steps. The rest of the deck is about which method copes with which, and the experiment on <a href="#slide-11">slide 11</a> shows both.</p>
+</section>
+
+<section class="slide" id="slide-03">
+    <div class="slide-number">03</div>
+    <h2>In-Silico Training and the Reality Gap</h2>
+    <p>The simplest method: train a digital model of the optics, then build or program the hardware with the result. Lin et al.'s diffractive deep neural network (D&sup2;NN) did exactly this: layers of diffractive elements whose transmission was trained in simulation, then 3D-printed and run at terahertz frequencies as a handwritten-digit classifier and an imaging lens (<a href="https://doi.org/10.1126/science.aat8084">Lin et al., Science 361, 1004, 2018</a>). Training was entirely digital; the optics only ran inference.</p>
+    <div class="diagram-flow">
+        <span class="diagram-box">Digital model</span>
+        <span class="diagram-arrow">&rarr;</span>
+        <span class="diagram-box">Train (backprop, on a computer)</span>
+        <span class="diagram-arrow">&rarr;</span>
+        <span class="diagram-box">Fabricate / program</span>
+        <span class="diagram-arrow">&rarr;</span>
+        <span class="diagram-box accent">Run on the real optics</span>
+    </div>
+    <p>It works when the model is good, and it is the only option for a passive, fabricated device. Its weakness is the <a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-realitygap">reality gap</a>: the trained parameters are optimal for the model, not for the hardware. Misalignment between layers, fabrication tolerance, material absorption and detector response all move the real device away from the model, and nothing in the training loop sees it.</p>
+    <div class="callout">
+        <div class="callout-label">The reality gap does not shrink with more training</div>
+        <p>In-silico training converges to the model's optimum. More steps, a better optimizer or a bigger batch only get closer to that point; the error from the mismatch stays. The only fixes are a better model or putting the hardware in the loop. The experiment on <a href="#slide-11">slide 11</a> shows the plateau.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-04">
+    <div class="slide-number">04</div>
+    <h2>The Adjoint Method: Gradients by Interference</h2>
+    <p>Hughes, Minkov, Shi and Fan showed that a reciprocal photonic circuit can measure its own gradient (<a href="https://doi.org/10.1364/OPTICA.5.000864">Optica 5, 864, 2018</a>). The adjoint method, long used for inverse design, says the derivative of a loss with respect to a phase shifter depends only on the forward field and the <em>adjoint</em> field at that shifter. The adjoint field is what you get by sending the output error backwards through the same circuit; reciprocity makes that the transpose the chain rule needs.</p>
+    <div class="canvas-wrap">
+        <svg viewBox="0 0 760 290" width="760" height="290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="An MZI mesh with a forward field travelling left to right, an adjoint field travelling right to left, and intensity monitors at a phase shifter measuring the forward, adjoint and interference intensities">
+            <style>
+                .bx { fill: rgba(151,205,198,0.08); stroke: #97cdc6; }
+                .bo { fill: rgba(222,128,90,0.10); stroke: #de805a; }
+                .ar { stroke: #a2978b; stroke-width: 1.5; fill: none; marker-end: url(#ah4); }
+                .arf { stroke: #aabd59; stroke-width: 2; fill: none; marker-end: url(#ah4f); }
+                .arb { stroke: #de805a; stroke-width: 2; fill: none; marker-end: url(#ah4b); }
+                .t  { fill: #efe8dc; font-family: 'Geist Mono', monospace; font-size: 12px; }
+                .d  { fill: #a2978b; font-family: 'Geist Mono', monospace; font-size: 10px; }
+                .tf { fill: #aabd59; font-family: 'Geist Mono', monospace; font-size: 12px; }
+                .tb { fill: #de805a; font-family: 'Geist Mono', monospace; font-size: 12px; }
+            </style>
+            <defs>
+                <marker id="ah4" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#a2978b"/></marker>
+                <marker id="ah4f" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#aabd59"/></marker>
+                <marker id="ah4b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#de805a"/></marker>
+            </defs>
+            <text x="20" y="128" class="t">input x</text>
+            <path d="M85 124 L125 124" class="ar"/>
+            <rect x="130" y="90" width="500" height="70" rx="8" class="bx"/>
+            <text x="140" y="108" class="d">MZI mesh (reciprocal)</text>
+            <rect x="160" y="115" width="80" height="34" rx="5" class="bx"/><text x="178" y="137" class="t">MZI</text>
+            <rect x="270" y="115" width="80" height="34" rx="5" class="bo"/><text x="285" y="137" class="t">&phi;_i</text>
+            <rect x="380" y="115" width="80" height="34" rx="5" class="bx"/><text x="398" y="137" class="t">MZI</text>
+            <rect x="490" y="115" width="80" height="34" rx="5" class="bx"/><text x="508" y="137" class="t">MZI</text>
+            <path d="M635 124 L670 124" class="ar"/>
+            <text x="676" y="120" class="t">y, loss L</text>
+            <text x="676" y="136" class="d">error &part;L/&part;y</text>
+            <path d="M140 72 L620 72" class="arf"/>
+            <text x="140" y="60" class="tf">1. forward: E_fwd, record |E_fwd|&sup2; at every &phi;</text>
+            <path d="M620 180 L140 180" class="arb"/>
+            <text x="140" y="200" class="tb">2. adjoint: error sent back from the outputs, record |E_adj|&sup2;</text>
+            <path d="M310 160 L310 225" class="ar"/>
+            <rect x="250" y="226" width="120" height="26" rx="5" class="bo"/><text x="262" y="243" class="t">monitor at &phi;_i</text>
+            <text x="385" y="236" class="t">3. input + time-reversed adjoint:</text>
+            <text x="385" y="252" class="d">record |E_fwd + E_adj*|&sup2;</text>
+            <text x="20" y="280" class="t">&part;L/&part;&phi;_i &prop; Re(E_fwd&middot;E_adj) = &frac12;(|E_fwd + E_adj*|&sup2; &minus; |E_fwd|&sup2; &minus; |E_adj|&sup2;)</text>
+        </svg>
+    </div>
+    <p>Because detectors measure intensity, the cross term is recovered from three intensity measurements at each phase shifter: the forward field, the adjoint field, and the two interfering. The gradient for <em>every</em> phase shifter comes out of the same three passes, in parallel, as the chain rule's dot product does on a GPU. What the method asks for is reciprocity, coherent sources that can inject a chosen adjoint field, and an intensity monitor beside every parameter.</p>
+    <p class="src">The identity |a + b*|&sup2; = |a|&sup2; + |b|&sup2; + 2&thinsp;Re(a&middot;b) is what turns three intensities into the product of two fields. Sign and scale constants are in the paper.</p>
+</section>
+
+<section class="slide" id="slide-05">
+    <div class="slide-number">05</div>
+    <h2>In-Situ Backpropagation, Demonstrated</h2>
+    <p>Pai et al. implemented the scheme on a programmable silicon-photonic MZI mesh and trained small classifiers with gradients measured on the chip (<a href="https://doi.org/10.1126/science.ade8450">Science 380, 398, 2023</a>). The hardware computed its own gradient, so whatever the chip actually does, the gradient is of that, not of a model of it.</p>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>What it buys</h4>
+            <ul>
+                <li>No reality gap in the gradient: fabrication error and crosstalk are inside the measurement</li>
+                <li>Gradients for all parameters from a fixed number of passes, not one perturbation per parameter</li>
+                <li>Training can continue as the device drifts</li>
+            </ul>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>What it costs</h4>
+            <ul>
+                <li>Several hardware passes per sample (forward, adjoint, interference), each read out at finite ENOB</li>
+                <li>A monitor beside every parameter, and coherent injection of the adjoint field</li>
+                <li>Nonlinearities between optical layers handled outside the optics</li>
+                <li>Demonstrated at small scale: a mesh of a few ports, not a megapixel mask</li>
+            </ul>
+        </div>
+    </div>
+    <h3>What it would mean in a 4f system (this deck's analysis)</h3>
+    <p>In a 4f engine the parameters are the Fourier-plane mask pixels. For y = h &lowast; u, the gradient with respect to the mask H is G&middot;conj(U), the filter gradient of <a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-corr">deck 01's correlation rule</a>. An adjoint pass would put the error spectrum and the input spectrum at the same plane, so a coherent camera there could <em>measure</em> the data-by-data product that deck 01 said could not sit on a mask. It needs phase-sensitive detection at every pixel (<a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-phaseproblem">the phase problem</a>) and is <strong>speculation</strong>: no such measurement at LLM scale has been published.</p>
+</section>
+
+<section class="slide" id="slide-06">
+    <div class="slide-number">06</div>
+    <h2>Physics-Aware Training</h2>
+    <p>Wright et al. proposed a hybrid: run the forward pass on the physical system, and the backward pass through a differentiable digital model of it (<a href="https://doi.org/10.1038/s41586-021-04223-6">Nature 601, 549, 2022</a>). They trained three different physical systems this way: broadband optical second-harmonic generation, a mechanical oscillating plate, and an analogue electronic circuit.</p>
+    <div class="diagram-flow">
+        <span class="diagram-box accent">Forward: real hardware</span>
+        <span class="diagram-arrow">&rarr;</span>
+        <span class="diagram-box">Real output, real error</span>
+        <span class="diagram-arrow">&rarr;</span>
+        <span class="diagram-box">Backward: digital twin</span>
+        <span class="diagram-arrow">&rarr;</span>
+        <span class="diagram-box">Update the physical parameters</span>
+    </div>
+    <ul>
+        <li><strong>The error is real.</strong> The loss and its error signal come from what the hardware actually produced, so the training loop sees the reality gap and steers against it.</li>
+        <li><strong>The gradient is approximate.</strong> The twin supplies the Jacobian; where the twin is wrong, the update direction is wrong. It still descends as long as the twin's gradient points within 90&deg; of the true one.</li>
+        <li><strong>Only one hardware pass per sample.</strong> No adjoint injection, no monitors inside the device: just the output, which any system has.</li>
+    </ul>
+    <div class="callout">
+        <div class="callout-label">When it breaks</div>
+        <p>For a linear filter the 90&deg; condition is per frequency: physics-aware training converges if the twin's phase error stays below 90&deg; at every frequency, and stalls or diverges where it does not. The experiment on <a href="#slide-11">slide 11</a> computes the worst phase error of its hidden distortion live; push the distortion until it passes 90&deg; and watch the physics-aware curve fail while the in-situ curve does not.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-07">
+    <div class="slide-number">07</div>
+    <h2>Direct Feedback Alignment and the Optical Random Projection</h2>
+    <p>Direct feedback alignment (DFA) drops the backward pass altogether. Each hidden layer receives the <em>output</em> error multiplied by its own fixed random matrix, instead of the error backpropagated through the transposed weights; the forward weights learn to align with the feedback (<a href="https://arxiv.org/abs/1609.01596">N&oslash;kland, NeurIPS 2016, arXiv:1609.01596</a>).</p>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Backpropagation</h4>
+            <p>&delta;<sub>l</sub> = (W<sub>l+1</sub><sup>T</sup> &delta;<sub>l+1</sub>) &odot; f&prime;(a<sub>l</sub>): sequential, layer by layer, through the transposed forward weights.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>DFA</h4>
+            <p>&delta;<sub>l</sub> = (B<sub>l</sub> e) &odot; f&prime;(a<sub>l</sub>): every layer at once, from one fixed random B<sub>l</sub>. No weight transport, no model of the forward path.</p>
+        </div>
+    </div>
+    <p>The fixed random projection B&thinsp;e is a large dense matrix multiply that never changes, which is what light through a scattering medium computes: a fixed random transmission matrix, applied in one pass, read out by a camera. Launay et al. built a photonic co-processor that does this projection and trained networks with DFA on it (<a href="https://arxiv.org/abs/2012.06373">arXiv:2012.06373, 2020</a>).</p>
+    <div class="callout">
+        <div class="callout-label">The catch</div>
+        <p>The projection needs no calibration because it only has to be fixed, not known: an elegant fit for optics. But DFA is a different learning rule, and its accuracy trails backpropagation on harder tasks; published evidence that it matches backpropagation when training large transformers is lacking. For LLM training, the optical part is a random matrix multiply, not a Fourier transform, and the method changes the algorithm the model is trained with.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-08">
+    <div class="slide-number">08</div>
+    <h2>Backprop-Free and Forward-Only Training</h2>
+    <p>Two 2023&ndash;2024 results train physical systems without any digital backward pass and without a model of the hardware:</p>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Local, forward-only learning</h4>
+            <p>Momeni et al. train each physical layer with a local objective computed from forward passes alone, in the spirit of Hinton's forward-forward algorithm, and demonstrate it on acoustic, microwave and optical systems (<a href="https://doi.org/10.1126/science.adi8474">Science 382, 1297, 2023</a>). No error is propagated between layers; no layer needs a model of the others.</p>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>Fully forward mode</h4>
+            <p>Xue et al. use spatial symmetry and Lorentz reciprocity so that the backward propagation of the error can itself be carried out as a forward propagation through the physical system, measured rather than modelled, in free-space and integrated optical networks (<a href="https://doi.org/10.1038/s41586-024-07687-4">Nature 632, 280, 2024</a>).</p>
+        </div>
+    </div>
+    <ul>
+        <li><strong>Common thread:</strong> the hardware does the gradient-like computation with the same kind of pass it already does well, so the reality gap stays out of the gradient (as in situ) without needing adjoint injection from the far end.</li>
+        <li><strong>Price:</strong> more passes per sample (paired or mirrored forward passes), and for local learning, a different learning rule from end-to-end backpropagation.</li>
+        <li><strong>Scale:</strong> demonstrated on optical networks with far fewer parameters than an LLM. Whether a local rule reaches backpropagation's accuracy at transformer scale is open.</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-09">
+    <div class="slide-number">09</div>
+    <h2>Analogue Noise in a Training Loop</h2>
+    <p>Stochastic gradient descent already lives with noise: a minibatch gradient is a noisy estimate of the full one. What matters about analogue error is not its size alone but whether it is <strong>zero-mean</strong>.</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Error</th><th>Example</th><th>In the forward pass</th><th>In the gradient</th></tr>
+        <tr><td><strong>Zero-mean, independent</strong></td><td>ADC quantisation with dither, shot and thermal noise</td><td>Acts like injected noise; training tolerates it, and noise injection is a known regulariser</td><td>Adds variance to the minibatch noise; averages out over steps, at a cost in convergence speed</td></tr>
+        <tr><td><strong>Biased, systematic</strong></td><td>Gain and phase error, saturation, offset, crosstalk, a mis-modelled twin</td><td>The model computes a different function; in-silico training never sees it</td><td>Shifts every gradient the same way; does not average out; moves the converged point</td></tr>
+        <tr><td><strong>Slow drift</strong></td><td>Temperature, laser power, SLM ageing</td><td>Biased within a window, changing across windows</td><td>Tracked by in-loop training; must be recalibrated otherwise</td></tr>
+    </table>
+    </div>
+    <p>The same distinction appears in low-precision digital training: rounding every update to nearest loses updates smaller than half a step, a biased error, while stochastic rounding is zero-mean and keeps them in expectation (<a href="https://arxiv.org/abs/1502.02551">Gupta et al., ICML 2015, arXiv:1502.02551</a>). For analogue parameter writes, the same holds: an SLM pixel or heater with finite resolution silently drops updates below its step unless the master copy of the parameter is kept digitally.</p>
+    <div class="callout">
+        <div class="callout-label">So, calibrate the bias; average the noise</div>
+        <p>Read-out noise sets a floor on what the deployed engine can deliver (the dashed line on <a href="#slide-11">slide 11</a>), but within a training loop it mostly washes out. Bias is what training on the wrong model cannot fix. Repeated passes cut random noise by &radic;k (<a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-averaging">averaging</a>) and do nothing for bias.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-10">
+    <div class="slide-number">10</div>
+    <h2>Precision for Training Formats</h2>
+    <p>Mixed-precision LLM training keeps activations and weights in BF16 or FP8 E4M3 and gradients in FP8 E5M2, which trades mantissa bits for range (<a href="https://arxiv.org/abs/2209.05433">Micikevicius et al., &ldquo;FP8 formats for deep learning&rdquo;, arXiv:2209.05433</a>: E4M3 reaches 448, E5M2 57,344). An analogue engine in that loop need not be exact; its read-out should add no more error than the format's own rounding. The inference series' <a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-floatenob">noise rule</a>, relative error = crest &times; 2<sup>&minus;ENOB</sup> &times; 2/&radic;12, applied to a 4,096-sample long convolution and its two gradients:</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Signal</th><th>Crest factor</th><th>ENOB for BF16</th><th>FP8 E4M3</th><th>FP8 E5M2</th></tr>
+        <tr><td>Forward y</td><td>3.55</td><td>10.3</td><td>6.3</td><td>5.3</td></tr>
+        <tr><td>Gradient dU (input)</td><td>3.72</td><td>10.3</td><td>6.3</td><td>5.3</td></tr>
+        <tr><td>Gradient dH (filter)</td><td>4.92</td><td>10.7</td><td>6.7</td><td>5.8</td></tr>
+    </table>
+    </div>
+    <p class="src">Source: <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Fourier_Optics_Training/blob/main/analysis/results.md">results.md</a>, &sect;5. The gradient signal carries rare spikes (1% of samples &times;4, an illustrative model of gradient outliers), which raise the crest factor.</p>
+    <ul>
+        <li><strong>E5M2 gradients are the easy case:</strong> about 5.3&ndash;5.8 ENOB, because E5M2 has only two mantissa bits. Its error is large already, so an analogue read-out can hide inside it.</li>
+        <li><strong>BF16 is the hard case:</strong> about 10.3&ndash;10.7 ENOB. By the averaging rule (&frac12;&thinsp;log<sub>2</sub>&thinsp;k bits from k passes), every extra bit costs four times the passes.</li>
+        <li><strong>Spiky gradients cost bits:</strong> the filter gradient's crest factor of 4.92 against 3.55 for the forward output adds about 0.4&ndash;0.5 ENOB at every format. Per-tensor scaling, as FP8 training uses, sets the range; it does not remove the outliers' claim on full scale.</li>
+        <li><strong>Matching the format is the bar, not convergence:</strong> the experiment on the next slide trains to the same filter quality across a wide range of ENOB, because zero-mean noise averages out (<a href="#slide-09">slide 09</a>).</li>
+    </ul>
+</section>
+
+<section class="slide" id="slide-11">
+    <div class="slide-number">11</div>
+    <h2>Interactive: Three Trainers, One Distorted Filter</h2>
+    <p>The &ldquo;hardware&rdquo; is a 1-D causal convolution with a hidden fixed distortion: a short kernel (equivalently a per-frequency gain and phase error) and a tanh saturation, read out with zero-mean noise at the chosen ENOB. The task: learn a 16-tap target filter by gradient descent. Three trainers see the same inputs:</p>
+    <ul>
+        <li><strong style="color:#de805a">In-silico:</strong> trains on the ideal digital convolution; the curve is its filter deployed on the hardware.</li>
+        <li><strong style="color:#e3b174">Physics-aware:</strong> forward on the hardware (with noise), backward through the ideal convolution.</li>
+        <li><strong style="color:#aabd59">In-situ:</strong> forward and backward on the hardware, both read out with noise (the backward through the true distortion and saturation, as an adjoint pass would see them).</li>
+    </ul>
+    <div class="control-panel">
+        <div class="sim-grid">
+            <div class="control-row"><label for="tr-s">Distortion strength</label><input type="range" id="tr-s" min="0" max="1" step="0.05" value="0.5"><span class="val" id="tr-s-val">0.50</span></div>
+            <div class="control-row"><label for="tr-e">Read-out ENOB</label><input type="range" id="tr-e" min="3" max="12" step="1" value="6"><span class="val" id="tr-e-val">6</span></div>
+            <div class="control-row"><label for="tr-lr">Learning rate</label><input type="range" id="tr-lr" min="0.02" max="0.4" step="0.02" value="0.1"><span class="val" id="tr-lr-val">0.10</span></div>
+            <div class="control-row"><label for="tr-n">Steps</label><input type="range" id="tr-n" min="50" max="500" step="50" value="200"><span class="val" id="tr-n-val">200</span></div>
+        </div>
+        <div class="metric-grid">
+            <div class="metric"><div class="metric-label">In-silico</div><div class="metric-value" id="tr-m-silico">&mdash;</div></div>
+            <div class="metric"><div class="metric-label">Physics-aware</div><div class="metric-value" id="tr-m-pat">&mdash;</div></div>
+            <div class="metric"><div class="metric-label">In-situ</div><div class="metric-value" id="tr-m-situ">&mdash;</div></div>
+            <div class="metric"><div class="metric-label">Worst phase error</div><div class="metric-value" id="tr-m-ph">&mdash;</div></div>
+        </div>
+        <div class="canvas-wrap" style="padding:0.4rem;"><canvas id="tr-plot" width="840" height="340" aria-label="Loss on hardware against training step for the three trainers"></canvas></div>
+        <div class="tr-legend"><span><i style="background:#de805a"></i>in-silico</span><span><i style="background:#e3b174"></i>physics-aware</span><span><i style="background:#aabd59"></i>in-situ</span><span><i class="dash"></i>read-out noise floor at this ENOB</span></div>
+        <div class="control-row" style="margin-top:0.6rem; margin-bottom:0;"><button class="btn secondary" id="tr-reset">Reset defaults</button><span class="d-note" id="tr-note"></span></div>
+    </div>
+    <p class="src">Illustrative toy, computed live in your browser with a seeded PRNG (results are reproducible). Defaults: distortion 0.5, ENOB 6, learning rate 0.1, 200 steps, seed 7. Setup: 64-sample sequences of Gaussian input, 8 per step, plain SGD from a zero filter; ADC full scale &plusmn;4&times; the target's RMS; the in-situ gradient read-out is auto-ranged to its own peak. Metrics are the hardware loss (normalised MSE) averaged over the last 10 steps, on 4 fixed evaluation sequences with the noise-free hardware; the dashed line is the read-out noise alone, which deployment adds on top.</p>
+    <ul>
+        <li><strong>Distortion 0:</strong> all three reach the target; in-silico is exact. Any distortion leaves in-silico on a plateau: the reality gap.</li>
+        <li><strong>Raise the distortion</strong> until the worst phase error passes 90&deg;: physics-aware training stalls, then diverges, while in-situ still descends (<a href="#slide-06">slide 06</a>).</li>
+        <li><strong>Lower the ENOB:</strong> the noise floor rises, but the trained filter barely changes, because zero-mean noise averages out (<a href="#slide-09">slide 09</a>).</li>
+        <li><strong>The honest exception:</strong> with a very small distortion (0.1), ENOB 3 and a high learning rate, the noise the in-loop trainers inject costs more than the bias they remove, and in-silico ends slightly ahead. Hardware in the loop pays off when bias, not noise, dominates.</li>
+    </ul>
+    <script>
+    // Trainer comparison: in-silico, physics-aware, in-situ, on a toy "optical" causal convolution.
+    (function (root) {
+        const N = 64, K = 16, B = 8, NEVAL = 4, FS = 4;   // samples per sequence, filter taps, batch, eval sequences, ADC full scale (x target RMS)
+        function mulberry32(a) {
+            return function () {
+                a |= 0; a = (a + 0x6D2B79F5) | 0;
+                let t = Math.imul(a ^ (a >>> 15), 1 | a);
+                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+        function gauss(rand) {
+            let u = 0; while (u === 0) u = rand();
+            return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand());
+        }
+        // target filter: a decaying oscillation, unit energy
+        const TARGET = new Float64Array(K);
+        (function () { let e = 0; for (let k = 0; k < 10; k++) { TARGET[k] = Math.exp(-k / 3) * Math.cos(0.9 * k); e += TARGET[k] ** 2; }
+                       for (let k = 0; k < K; k++) TARGET[k] /= Math.sqrt(e); })();
+        // the hidden distortion: a short kernel d (= a per-frequency gain and phase error) and a tanh saturation
+        const D_SHAPE = [-0.25, 0.45, -0.3, 0.15];
+        function distortion(s) { return { d: [1 + s * D_SHAPE[0], s * D_SHAPE[1], s * D_SHAPE[2], s * D_SHAPE[3]], beta: 0.35 * s }; }
+
+        function conv(h, hl, u, out) {           // causal: out[n] = sum_k h[k] u[n-k]
+            for (let n = 0; n < N; n++) { let a = 0; const m = Math.min(hl - 1, n); for (let k = 0; k <= m; k++) a += h[k] * u[n - k]; out[n] = a; }
+        }
+        function corr(e, u, kl, out) {           // out[k] = sum_n e[n] u[n-k]
+            for (let k = 0; k < kl; k++) { let a = 0; for (let n = k; n < N; n++) a += e[n] * u[n - k]; out[k] = a; }
+        }
+        function effFilter(h, d, out) {          // h_eff = d * h, length K + 3
+            out.fill(0); for (let k = 0; k < K; k++) for (let j = 0; j < 4; j++) out[k + j] += d[j] * h[k];
+        }
+        const sat = (z, b) => b > 0 ? Math.tanh(b * z) / b : z;
+        const dsat = (z, b) => { if (b <= 0) return 1; const t = Math.tanh(b * z); return 1 - t * t; };
+
+        function makeData(seed, count) {
+            const r = mulberry32(seed), us = [], ts = [];
+            for (let i = 0; i < count; i++) { const u = new Float64Array(N); for (let n = 0; n < N; n++) u[n] = gauss(r); const t = new Float64Array(N); conv(TARGET, K, u, t); us.push(u); ts.push(t); }
+            return { us, ts };
+        }
+        const EVAL = makeData(12345, NEVAL);
+        let P_EVAL = 0; for (const t of EVAL.ts) for (let n = 0; n < N; n++) P_EVAL += t[n] * t[n]; P_EVAL /= NEVAL * N;
+
+        // hardware loss of filter h: noise-free hardware forward on the fixed evaluation set, normalised MSE
+        function hwLoss(h, dist, he, z) {
+            effFilter(h, dist.d, he); let s = 0;
+            for (let i = 0; i < NEVAL; i++) { conv(he, K + 3, EVAL.us[i], z); const t = EVAL.ts[i]; for (let n = 0; n < N; n++) { const e = sat(z[n], dist.beta) - t[n]; s += e * e; } }
+            return s / (NEVAL * N * P_EVAL);
+        }
+
+        // mode: 'silico' | 'pat' | 'situ'
+        // the training stream: fresh Gaussian inputs every step, the same for all three trainers
+        function stream(o) {
+            const r = mulberry32(o.seed), len = o.steps * B * N, us = new Float64Array(len), ts = new Float64Array(len);
+            for (let i = 0; i < len; i++) us[i] = gauss(r);
+            for (let j = 0; j < o.steps * B; j++) conv(TARGET, K, us.subarray(j * N, j * N + N), ts.subarray(j * N, j * N + N));
+            return { us, ts };
+        }
+        function train(mode, o, data) {
+            data = data || stream(o);
+            const dist = distortion(o.strength), steps = o.steps, lr = o.lr;
+            const sigF = 2 * FS * Math.pow(2, -o.enob) / Math.sqrt(12);        // forward read-out noise RMS (zero-mean)
+            const noiseRand = mulberry32(o.seed ^ 0x9e3779b9);
+            const h = new Float64Array(K), g = new Float64Array(K), gk = new Float64Array(K + 3), he = new Float64Array(K + 3);
+            let u, t; const z = new Float64Array(N), e = new Float64Array(N), b = new Float64Array(N);
+            const loss = new Float64Array(steps + 1);
+            loss[0] = hwLoss(h, dist, he, z);
+            const scale = 2 / (B * N * P_EVAL);
+            for (let s = 0; s < steps; s++) {
+                g.fill(0);
+                for (let i = 0; i < B; i++) {
+                    const off = (s * B + i) * N; u = data.us.subarray(off, off + N); t = data.ts.subarray(off, off + N);
+                    if (mode === 'silico') {                       // ideal digital model, no hardware in the loop
+                        conv(h, K, u, z); for (let n = 0; n < N; n++) e[n] = z[n] - t[n];
+                        corr(e, u, K, gk); for (let k = 0; k < K; k++) g[k] += gk[k];
+                    } else {
+                        effFilter(h, dist.d, he); conv(he, K + 3, u, z);  // forward on the hardware...
+                        for (let n = 0; n < N; n++) e[n] = sat(z[n], dist.beta) + sigF * gauss(noiseRand) - t[n];  // ...read out with noise
+                        if (mode === 'pat') {                      // backward through the ideal model
+                            corr(e, u, K, gk); for (let k = 0; k < K; k++) g[k] += gk[k];
+                        } else {                                   // backward on the hardware: through sat' and the adjoint of d
+                            for (let n = 0; n < N; n++) b[n] = e[n] * dsat(z[n], dist.beta);
+                            corr(b, u, K + 3, gk);                 // gradient w.r.t. h_eff, as measured
+                            let pk = 0; for (let k = 0; k < K + 3; k++) pk = Math.max(pk, Math.abs(gk[k]));
+                            const sigB = 2 * pk * Math.pow(2, -o.enob) / Math.sqrt(12);  // auto-ranged gradient read-out
+                            for (let k = 0; k < K + 3; k++) gk[k] += sigB * gauss(noiseRand);
+                            for (let k = 0; k < K; k++) { let a = 0; for (let j = 0; j < 4; j++) a += dist.d[j] * gk[k + j]; g[k] += a; }
+                        }
+                    }
+                }
+                for (let k = 0; k < K; k++) h[k] -= lr * scale * g[k];
+                const l = hwLoss(h, dist, he, z);
+                if (!(l < 1e6)) { loss.fill(1e6, s + 1); break; }   // diverged: stop and pin the curve
+                loss[s + 1] = l;
+            }
+            return { loss, h };
+        }
+        function runAll(o) {
+            const data = stream(o), out = {};
+            for (const m of ['silico', 'pat', 'situ']) out[m] = train(m, o, data).loss;
+            // the noise floor: read-out noise alone, as a normalised MSE
+            out.floor = (2 * FS * Math.pow(2, -o.enob) / Math.sqrt(12)) ** 2 / P_EVAL;
+            return out;
+        }
+        // worst phase error (degrees) of the hidden kernel's frequency response, 0..Nyquist
+        function worstPhase(strength) {
+            const d = distortion(strength).d; let w = 0;
+            for (let i = 0; i <= 512; i++) {
+                const om = Math.PI * i / 512; let re = 0, im = 0;
+                for (let j = 0; j < 4; j++) { re += d[j] * Math.cos(om * j); im -= d[j] * Math.sin(om * j); }
+                w = Math.max(w, Math.abs(Math.atan2(im, re)) * 180 / Math.PI);
+            }
+            return w;
+        }
+        root.TrainDemo = { runAll, train, worstPhase, DEFAULTS: { strength: 0.5, enob: 6, lr: 0.1, steps: 200, seed: 7 } };
+    })(typeof window !== 'undefined' ? window : globalThis);
+    </script>
+    <script>
+    (function () {
+        const T = window.TrainDemo, $ = id => document.getElementById(id);
+        const COL = { silico: '#de805a', pat: '#e3b174', situ: '#aabd59' };
+        const D = T.DEFAULTS;
+        let last = null;
+        const fx = x => x >= 0.01 ? x.toFixed(3) : x.toExponential(1);
+        function tail(a) { let s = 0; const n = Math.min(10, a.length - 1); for (let i = a.length - n; i < a.length; i++) s += a[i]; return s / n; }
+        function draw() {
+            if (!last) return;
+            const c = $('tr-plot'), dpr = window.devicePixelRatio || 1;
+            const cw = Math.max(260, c.clientWidth || 840), ch = Math.round(cw * (cw < 500 ? 0.75 : 0.42));
+            c.width = Math.round(cw * dpr); c.height = Math.round(ch * dpr); c.style.height = ch + 'px';
+            const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, cw, ch);
+            const css = getComputedStyle(document.body);
+            const sec = (css.getPropertyValue('--text-secondary') || '#a2978b').trim(), bord = (css.getPropertyValue('--border') || '#3a322b').trim();
+            const L = 52, R = 10, Tp = 10, Bm = 34, W = cw - L - R, H = ch - Tp - Bm;
+            const lo = -6, hi = 1, steps = last.silico.length - 1;
+            const X = i => L + W * i / steps, Y = v => Tp + H * (hi - Math.min(hi, Math.max(lo, Math.log10(Math.max(v, 1e-12))))) / (hi - lo);
+            g.font = '11px ' + (css.getPropertyValue('--font-mono') || 'monospace'); g.lineWidth = 1;
+            for (let p = lo; p <= hi; p++) {
+                g.strokeStyle = bord; g.beginPath(); g.moveTo(L, Y(10 ** p)); g.lineTo(L + W, Y(10 ** p)); g.stroke();
+                g.fillStyle = sec; g.textAlign = 'right'; g.fillText('1e' + p, L - 6, Y(10 ** p) + 4);
+            }
+            g.textAlign = 'center';
+            for (let k = 0; k <= 4; k++) { const i = Math.round(steps * k / 4); g.fillText(String(i), X(i), Tp + H + 16); }
+            g.fillText('step', L + W / 2, Tp + H + 30);
+            g.save(); g.translate(12, Tp + H / 2); g.rotate(-Math.PI / 2); g.fillText('loss on hardware', 0, 0); g.restore();
+            g.setLineDash([5, 4]); g.strokeStyle = sec; g.beginPath(); g.moveTo(L, Y(last.floor)); g.lineTo(L + W, Y(last.floor)); g.stroke(); g.setLineDash([]);
+            g.lineWidth = 2;
+            for (const m of ['silico', 'pat', 'situ']) {
+                const a = last[m]; g.strokeStyle = COL[m]; g.beginPath();
+                for (let i = 0; i < a.length; i++) { const x = X(i), y = Y(a[i]); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+                g.stroke();
+            }
+        }
+        function run() {
+            const o = { strength: +$('tr-s').value, enob: +$('tr-e').value, lr: +$('tr-lr').value, steps: +$('tr-n').value, seed: D.seed };
+            $('tr-s-val').textContent = o.strength.toFixed(2); $('tr-e-val').textContent = o.enob;
+            $('tr-lr-val').textContent = o.lr.toFixed(2); $('tr-n-val').textContent = o.steps;
+            const t0 = performance.now(); last = T.runAll(o); const dt = performance.now() - t0;
+            const out = {};
+            for (const m of ['silico', 'pat', 'situ']) { out[m] = tail(last[m]); $('tr-m-' + m).textContent = isFinite(out[m]) ? fx(out[m]) : 'diverged'; }
+            out.phase = T.worstPhase(o.strength);
+            $('tr-m-ph').textContent = out.phase.toFixed(0) + '°';
+            $('tr-note').textContent = `noise floor ${fx(last.floor)}; ran in ${dt.toFixed(0)} ms`;
+            draw();
+            return out;
+        }
+        ['tr-s', 'tr-e', 'tr-lr', 'tr-n'].forEach(k => $(k).addEventListener('input', run));
+        $('tr-reset').addEventListener('click', () => { $('tr-s').value = D.strength; $('tr-e').value = D.enob; $('tr-lr').value = D.lr; $('tr-n').value = D.steps; run(); });
+        window.addEventListener('resize', draw);
+        window.trainDemo = { set(o) { for (const [k, v] of Object.entries(o)) $(k).value = v; return run(); }, run };
+        run();
+    })();
+    </script>
+</section>
+
+<section class="slide" id="slide-12">
+    <div class="slide-number">12</div>
+    <h2>The Methods Compared</h2>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Method</th><th>Who computes the gradient</th><th>Needs a model?</th><th>Hardware passes per step</th><th>Scaling evidence</th></tr>
+        <tr><td><strong>Digital backprop</strong> (reference)</td><td>The chain rule, on stored activations</td><td>The code is the model</td><td>None; backward costs about 2&times; forward (<a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-sixn">the 6N rule</a>)</td><td>Every LLM</td></tr>
+        <tr><td><strong>In-silico</strong> (D&sup2;NN)</td><td>A computer, on a model of the optics</td><td>Yes, and it must be accurate</td><td>None while training; the hardware only runs the result</td><td>Fabricated diffractive networks on small vision tasks (Lin 2018)</td></tr>
+        <tr><td><strong>In-situ backprop</strong> (adjoint)</td><td>The hardware, by interference</td><td>No; needs reciprocity, adjoint injection, monitors at every parameter</td><td>Forward, adjoint and interference passes per sample</td><td>Small MZI meshes (Pai 2023)</td></tr>
+        <tr><td><strong>Physics-aware</strong></td><td>A digital twin, on the hardware's real outputs</td><td>Yes, differentiable but approximate</td><td>One forward pass per sample</td><td>Three different physical systems on small tasks (Wright 2022)</td></tr>
+        <tr><td><strong>DFA</strong>, optical projection</td><td>Fixed random projection of the output error</td><td>No: the projection must be fixed, not known</td><td>One projection per sample, plus the forward pass</td><td>Photonic co-processor (Launay 2020); lags backprop on harder tasks</td></tr>
+        <tr><td><strong>Forward-only</strong></td><td>The hardware, from forward passes (local objectives, or a reciprocal mirror of the backward pass)</td><td>No</td><td>Two or more forward passes per sample</td><td>Optical, acoustic, microwave demonstrations (Momeni 2023; Xue 2024)</td></tr>
+    </table>
+    </div>
+    <p>Two axes separate them: <strong>how much of the gradient comes from the real device</strong> (in-silico none, physics-aware the error only, in-situ and forward-only all of it), and <strong>whether the learning rule is still backpropagation</strong> (DFA and local learning change it). Only methods that keep backpropagation and take the gradient from the device remove both the reality gap and the algorithm risk; they are also the ones that ask the most of the hardware.</p>
+</section>
+
+<section class="slide" id="slide-13">
+    <div class="slide-number">13</div>
+    <h2>What Maps onto an LLM-Scale Transform Engine</h2>
+    <p>The engine of deck 01 computes fixed transforms (FFTs and Fourier-domain products) on values it is handed. The LLM's weights, master copies and optimizer stay digital; a weight spectrum is written to the mask once per step and read back by nothing. So the training methods in this deck are <strong>not</strong> a way to train the LLM. They matter for the engine's <strong>own</strong> parameters: the transfer function of its lenses, mask pixels and detectors.</p>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>What carries over</h4>
+            <ul>
+                <li><strong>Calibration is training.</strong> Fitting a correction so the engine computes the transform the digital code assumes is a small in-loop training problem: probe inputs, measured outputs, a fitted correction.</li>
+                <li><strong>Hardware in the loop beats a model.</strong> Characterise the engine on the engine (in-situ or physics-aware style), not only from its design (in-silico), or the reality gap appears as a bias in every forward and backward pass.</li>
+                <li><strong>Bias versus noise.</strong> Calibrate gain, phase, offset and saturation; tolerate zero-mean read-out noise at the format's ENOB (<a href="#slide-10">slide 10</a>).</li>
+                <li><strong>Drift.</strong> Recalibration has to run during a long training job, between optimizer steps.</li>
+            </ul>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>What does not</h4>
+            <ul>
+                <li><strong>The LLM's gradients</strong> are computed digitally by the chain rule, with the engine doing some of the transforms; nothing here replaces that.</li>
+                <li><strong>DFA and forward-only rules</strong> change the learning algorithm, a risk no LLM training run will take for a 0.15% FLOP share.</li>
+                <li><strong>In-situ measurement of the weight gradient</strong> (<a href="#slide-05">slide 05</a>) is the one speculative bridge: it would measure the data-by-data product optically, but needs coherent detection at megapixel scale.</li>
+            </ul>
+        </div>
+    </div>
+    <div class="callout">
+        <div class="callout-label">The physics-aware lesson, applied (speculation)</div>
+        <p>If the engine computes the forward and backward transforms of an LLM layer and the digital side computes the chain rule as if they were exact, the LLM itself is being trained physics-aware style: real (distorted) outputs, idealised gradients. The experiment shows that converges while the per-frequency phase error stays well inside 90&deg;, and that the residual error is set by the bias, not the noise. That gives a calibration target for an engine in a training loop. This mapping is the author's own analysis, attributed to no company.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-14">
+    <div class="slide-number">14</div>
+    <h2>What to Take Away</h2>
+    <ul>
+        <li><strong>Optics has parameters of its own, and no exact model.</strong> Every training method for optical hardware is an answer to &ldquo;who computes the gradient&rdquo;: a model (in-silico), the device by interference (in-situ, the adjoint method), a twin fed real outputs (physics-aware), a fixed random projection (DFA), or forward passes alone.</li>
+        <li><strong>In-silico training leaves a reality gap</strong> that no amount of training closes; any method with the hardware in the loop closes some or all of it. In the live experiment, in-silico plateaus wherever the distortion is non-zero.</li>
+        <li><strong>Physics-aware training is cheap and robust</strong> until the twin's gradient points more than 90&deg; from the truth; in-situ measurement has no such limit but asks for adjoint injection and monitors at every parameter.</li>
+        <li><strong>Calibrate bias, average noise.</strong> Zero-mean read-out noise washes out in a training loop; systematic error does not. The deployed engine still needs the format's ENOB: about 5.3&ndash;5.8 for FP8 E5M2 gradients, 6.3&ndash;6.7 for E4M3, 10.3&ndash;10.7 for BF16 (results.md &sect;5).</li>
+        <li><strong>For an LLM-scale transform engine</strong> these methods calibrate the engine; they do not train the LLM, whose weights and optimizer stay digital.</li>
+        <li><strong>Next:</strong> <a href="https://brendanjameslynskey.github.io/FOptTrn_03_Optical_Training_Clusters/">deck 03, Optical Engines in a Training Cluster</a>, places an engine in data-, tensor- and pipeline-parallel training: step time against mask-rewrite time, layer-major scheduling, and DeMo's frequency-domain gradient compression.</li>
+    </ul>
+</section>
+
+<!-- ════════════════════════════════════ Footer ════════════════════════════════════ -->
+<footer class="footer">
+    <p>Part of the <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Fourier_Optics_Training">Fourier Optics for Training series</a> &middot; <a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#glossary">glossary: every concept and where it is explained</a> &middot; numbers: <a href="https://github.com/BrendanJamesLynskey/LLM_Hub_Fourier_Optics_Training/blob/main/analysis/results.md">analysis/results.md</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.8rem;"><a href="https://brendanjameslynskey.github.io/FOptTrn_01_Transforms_in_Training/">&larr; 01 Transforms in Training Workloads</a> &nbsp;&middot;&nbsp; <a href="https://brendanjameslynskey.github.io/FOptTrn_03_Optical_Training_Clusters/">03 Optical Engines in a Training Cluster &rarr;</a></p>
+    <p style="margin-top: 0.5rem; font-size: 0.8rem;">Sister series: <a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/">Fourier Optics for Inference</a> &middot; <a href="https://brendanjameslynskey.github.io/LLM_Hub_Compute_in_Transit/">Compute in Transit</a> &middot; <a href="https://brendanjameslynskey.github.io/FHE_Hub_Accelerator_Simulators/">FHE Accelerator Simulators</a> &middot; <a href="https://brendanjameslynskey.github.io/SimEng_Hub_Toolkit/">Simulation Engineering Toolkit</a></p>
+</footer>
+
+<script>
+    // Smooth scroll for TOC links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+
+    // Subtle fade-in on scroll
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.slide').forEach(slide => {
+        slide.style.opacity = '0';
+        slide.style.transform = 'translateY(30px)';
+        slide.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(slide);
+    });
+</script>
+
+</body>
+</html>

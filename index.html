@@ -793,6 +793,7 @@
         @media (max-width: 640px) { .diagram-box { white-space: normal; max-width: 100%; } }   /* long boxes must wrap on phones */
         /* FOptInf: keep long titles clear of the slide number on phones */
         @media (max-width: 640px) { .slide h2 { padding-right: 3.6rem; } }
+        .slide h2 { padding-right: 3.6rem; }   /* long titles must clear the slide number on desktop too */
         .sim-grid select, .sim-grid input[type="range"] { max-width: 100%; min-width: 0; }   /* long option labels must not spill into the next column */
         /* ── FOptTrn 02: trainer demo legend ── */
         .tr-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); }
@@ -800,13 +801,13 @@
         .tr-legend i.dash { background: none; border-top: 2px dashed var(--text-secondary); height: 0; }
         .d-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); }
         .src { font-size: 0.82rem; }
-        #slide-11 .sim-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); }
-        #slide-11 .control-row label { min-width: 9.5rem; }
-        #slide-11 .control-row .val { min-width: 3.5rem; }
-        #slide-11 .control-row input[type="range"] { min-width: 120px; }
+        #slide-12 .sim-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); }
+        #slide-12 .control-row label { min-width: 9.5rem; }
+        #slide-12 .control-row .val { min-width: 3.5rem; }
+        #slide-12 .control-row input[type="range"] { min-width: 120px; }
         @media (max-width: 640px) {
-            #slide-11 .control-row { gap: 0.2rem 0.75rem; }
-            #slide-11 .control-row label { flex-basis: 100%; }
+            #slide-12 .control-row { gap: 0.2rem 0.75rem; }
+            #slide-12 .control-row label { flex-basis: 100%; }
         }
         .hero { overflow: hidden; }   /* the 600px glow must not widen the page on phones */
     </style>
@@ -816,7 +817,7 @@
 <header class="hero">
     <div class="series-label">Fourier Optics for Training &mdash; Presentation 02</div>
     <h1>Optical <span class="accent">Backpropagation</span> and In-Situ Training</h1>
-    <p class="subtitle">The question turned around: how is optical hardware itself trained, and what does that teach about putting optics in an LLM training loop? In-silico training and the reality gap, the adjoint method, physics-aware training, direct feedback alignment, forward-only methods, analogue noise, the ADC precision a training format asks for, and a live experiment that trains one distorted filter three ways.</p>
+    <p class="subtitle">The question turned around: how is optical hardware itself trained, and what does that teach about putting optics in an LLM training loop? In-silico training and the reality gap, the adjoint method, physics-aware training, direct feedback alignment, forward-only methods, analogue noise and a measured case of it inside DeMo's feedback loop, the ADC precision a training format asks for, and a live experiment that trains one distorted filter three ways.</p>
 
     <div class="tags">
         <span class="tag">Reality gap</span>
@@ -825,6 +826,7 @@
         <span class="tag">DFA</span>
         <span class="tag">Forward-only</span>
         <span class="tag">FP8 gradients</span>
+        <span class="tag">Error feedback</span>
     </div>
 
     <div class="pipeline">
@@ -853,15 +855,16 @@
         <li><a href="#slide-07">Direct Feedback Alignment and the Optical Random Projection</a></li>
         <li><a href="#slide-08">Backprop-Free and Forward-Only Training</a></li>
         <li><a href="#slide-09">Analogue Noise in a Training Loop</a></li>
-        <li><a href="#slide-10">Precision for Training Formats</a></li>
-        <li><a href="#slide-11">Interactive: Three Trainers, One Distorted Filter</a></li>
-        <li><a href="#slide-12">The Methods Compared</a></li>
-        <li><a href="#slide-13">What Maps onto an LLM-Scale Transform Engine</a></li>
-        <li><a href="#slide-14">What to Take Away</a></li>
+        <li><a href="#slide-10">A Measured Case: Optics Inside DeMo's Feedback Loop</a></li>
+        <li><a href="#slide-11">Precision for Training Formats</a></li>
+        <li><a href="#slide-12">Interactive: Three Trainers, One Distorted Filter</a></li>
+        <li><a href="#slide-13">The Methods Compared</a></li>
+        <li><a href="#slide-14">What Maps onto an LLM-Scale Transform Engine</a></li>
+        <li><a href="#slide-15">What to Take Away</a></li>
     </ul>
     <div class="concepts">
         <p><strong>Concepts used here, and where they are explained.</strong> Each links to a glossary entry: this <a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#glossary">series glossary</a>, or the <a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#glossary">Fourier Optics for Inference glossary</a> for the physics and precision concepts that series already explains.</p>
-        <div class="chips"><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-mzimesh" title="A triangular (Reck) or rectangular (Clements) grid of MZIs implements any N×N unitary, including the DFT, on a chip: N(N−1)/2 MZIs, each with a phase shifter that must be calibrated and held.">Mach–Zehnder interferometer (MZI) meshes</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-convthm" title="A convolution in one domain is a pointwise product in the other: F{h ∗ u} = F{h}·F{u}. A 4f system uses it optically (mask = filter spectrum); FFT convolution uses it digitally in O(n log n).">The convolution theorem</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-slm" title="A pixelated device that writes values into a light field. Liquid-crystal SLMs modulate phase or amplitude and settle in tens of milliseconds; a 2-megapixel digital micromirror device switches amplitude at about 1 kHz with 8-bit depth (20 kHz binary). Pixel count and frame rate bound how fast inputs and Fourier-plane masks can change.">Spatial light modulator (SLM)</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-phaseproblem" title="Photodetectors measure intensity |E|², losing the sign and phase of the field. Remedies: interfere with a reference beam (coherent detection), add a bias so the field stays positive, split positive and negative parts into two passes, or recover phase iteratively (phase retrieval).">Square-law detection and the phase problem</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-d2nn" title="Stacks of passive diffractive layers whose transmission is trained in simulation and then fabricated (Lin et al., Science 2018). Training is entirely digital; the optics only runs inference, so model mismatch after fabrication is the central problem.">Diffractive deep neural networks (D²NN)</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-realitygap" title="The difference between the model a network was trained on and the hardware it runs on: fabrication error, drift, crosstalk, temperature. In-situ and hardware-in-the-loop training close it; in-silico training does not.">The reality gap</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-adjoint" title="In a reciprocal photonic circuit, the gradient with respect to every phase shifter can be measured by sending the error signal backwards and interfering it with the stored forward field (Hughes et al., Optica 2018; demonstrated in a programmable photonic chip by Pai et al., Science 2023). The hardware computes its own gradient.">In-situ backpropagation (the adjoint method)</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-pat" title="Run the forward pass on the physical system and the backward pass through a differentiable digital model of it, so the update uses the real output but an approximate gradient (Wright et al., Nature 2022). It tolerates mismatch that pure in-silico training does not.">Physics-aware training</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-dfa" title="Replace each layer&#x27;s backpropagated error with a fixed random projection of the output error. The random projection is a large matrix multiply an optical scattering medium does for free; a photonic co-processor has trained networks this way (Launay et al., 2020). It scales poorly to transformers&#x27; accuracy.">Direct feedback alignment (DFA)</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-noisereg" title="Zero-mean read-out noise in the forward pass acts like injected noise, which training can tolerate or even exploit; noise in the gradient adds to minibatch noise. Biased errors (offset, nonlinearity, drift) do not average out and must be calibrated.">Analogue noise in a training loop</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-averaging" title="Repeating an analogue operation k times and averaging cuts random noise by √k, buying ½ log2 k bits: one extra bit costs four times the passes. Digit planes, which make FHE exact, do not help a float workload.">Dynamic precision by repeated passes</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-gradprecision" title="Training keeps activations and weights in BF16 or FP8 E4M3 and gradients in FP8 E5M2, which trades mantissa for range. Applying the inference series&#x27; noise rule, matching E5M2 needs about 5.3–5.8 ENOB and BF16 about 10.3–10.7, higher for spiky gradients whose crest factor is larger.">Gradient precision and FP8 E5M2</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-floatenob" title="For float workloads the analogue chain must match the number format&#x27;s own rounding error, not be exact. Relative RMS error = crest × 2−ENOB × 2/√12; matching BF16 needs about 10.3 ENOB, INT8 8.0, FP8 E4M3 6.3. FHE&#x27;s exact-rounding rule does not transfer to long convolutions.">The noise rule for floating-point workloads</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-crest" title="The ratio of a signal&#x27;s peak to its RMS value. An ADC&#x27;s full scale must cover the peak, so a high crest factor wastes resolution on the rare large values: the noise rule&#x27;s error scales with it.">Crest factor</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-corr" title="For y = h ∗ u, the input gradient is G correlated with h, IFFT(G·conj(H)), and the filter gradient is G correlated with u, IFFT(G·conj(U)). A backward long convolution is one more FFT and two more Fourier-domain products than the forward; the analysis checks the formulas against direct sums and finite differences.">The gradient of a convolution is a correlation</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-masked" title="A Fourier-domain product whose second operand is a weight spectrum (forward H, backward conj(H)) can be a mask written once per optimizer step. One whose operands both depend on the sample (conj(U)·G for the weight gradient) needs a new mask for every sequence, and in practice stays digital.">Weight-masked and data-by-data products</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-maskrewrite" title="An inference engine writes its filter spectra once; a training engine must rewrite them after every optimizer step, for the forward and the backward pass. Processing the whole step layer by layer amortises each write over every sequence, but the frame budget still rivals the digital step time.">Mask rewrites per optimizer step</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-transformengine" title="An optical MAC accelerates every matrix multiply (the simulator&#x27;s hypothetical optical part); a Fourier transform engine accelerates only FFT and convolution work and leaves matmuls to a digital part.">Transform engine against optical MAC</a></div>
+        <div class="chips"><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-mzimesh" title="A triangular (Reck) or rectangular (Clements) grid of MZIs implements any N×N unitary, including the DFT, on a chip: N(N−1)/2 MZIs, each with a phase shifter that must be calibrated and held.">Mach–Zehnder interferometer (MZI) meshes</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-convthm" title="A convolution in one domain is a pointwise product in the other: F{h ∗ u} = F{h}·F{u}. A 4f system uses it optically (mask = filter spectrum); FFT convolution uses it digitally in O(n log n).">The convolution theorem</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-slm" title="A pixelated device that writes values into a light field. Liquid-crystal SLMs modulate phase or amplitude and settle in tens of milliseconds; a 2-megapixel digital micromirror device switches amplitude at about 1 kHz with 8-bit depth (20 kHz binary). Pixel count and frame rate bound how fast inputs and Fourier-plane masks can change.">Spatial light modulator (SLM)</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-phaseproblem" title="Photodetectors measure intensity |E|², losing the sign and phase of the field. Remedies: interfere with a reference beam (coherent detection), add a bias so the field stays positive, split positive and negative parts into two passes, or recover phase iteratively (phase retrieval).">Square-law detection and the phase problem</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-d2nn" title="Stacks of passive diffractive layers whose transmission is trained in simulation and then fabricated (Lin et al., Science 2018). Training is entirely digital; the optics only runs inference, so model mismatch after fabrication is the central problem.">Diffractive deep neural networks (D²NN)</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-realitygap" title="The difference between the model a network was trained on and the hardware it runs on: fabrication error, drift, crosstalk, temperature. In-situ and hardware-in-the-loop training close it; in-silico training does not.">The reality gap</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-adjoint" title="In a reciprocal photonic circuit, the gradient with respect to every phase shifter can be measured by sending the error signal backwards and interfering it with the stored forward field (Hughes et al., Optica 2018; demonstrated in a programmable photonic chip by Pai et al., Science 2023). The hardware computes its own gradient.">In-situ backpropagation (the adjoint method)</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-pat" title="Run the forward pass on the physical system and the backward pass through a differentiable digital model of it, so the update uses the real output but an approximate gradient (Wright et al., Nature 2022). It tolerates mismatch that pure in-silico training does not.">Physics-aware training</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-dfa" title="Replace each layer&#x27;s backpropagated error with a fixed random projection of the output error. The random projection is a large matrix multiply an optical scattering medium does for free; a photonic co-processor has trained networks this way (Launay et al., 2020). It scales poorly to transformers&#x27; accuracy.">Direct feedback alignment (DFA)</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-noisereg" title="Zero-mean read-out noise in the forward pass acts like injected noise, which training can tolerate or even exploit; noise in the gradient adds to minibatch noise. Biased errors (offset, nonlinearity, drift) do not average out and must be calibrated.">Analogue noise in a training loop</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-averaging" title="Repeating an analogue operation k times and averaging cuts random noise by √k, buying ½ log2 k bits: one extra bit costs four times the passes. Digit planes, which make FHE exact, do not help a float workload.">Dynamic precision by repeated passes</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-gradprecision" title="Training keeps activations and weights in BF16 or FP8 E4M3 and gradients in FP8 E5M2, which trades mantissa for range. Applying the inference series&#x27; noise rule, matching E5M2 needs about 5.3–5.8 ENOB and BF16 about 10.3–10.7, higher for spiky gradients whose crest factor is larger.">Gradient precision and FP8 E5M2</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-errorfeedback" title="A compressed-gradient optimizer such as DeMo sends only part of each update and keeps the rest in a residual: the delta is the momentum plus the residual, which decays by 0.999 per step. What it subtracts must be what was actually sent; subtracting an idealised value leaves the difference uncorrected forever, a bias that repeats every step.">Error feedback</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-bitplanes" title="An analogue engine with few bits of input resolution carries each integer as P binary planes, one optical pass per plane, recombined digitally with weights 2^b. The read-out noise per plane is multiplied by the square root of the sum of 4^b (147.8 for 8 planes), so more planes cost passes and need not buy accuracy.">Bit planes</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-fixedband" title="Gradient compression that sends the same low-frequency DCT coefficients of every chunk at every step, rather than the largest ones (top-k). It is a fixed linear transform an optical engine could compute, but in the Compute in Transit experiment it ended far behind top-k and AdamW.">Fixed frequency band</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-floatenob" title="For float workloads the analogue chain must match the number format&#x27;s own rounding error, not be exact. Relative RMS error = crest × 2−ENOB × 2/√12; matching BF16 needs about 10.3 ENOB, INT8 8.0, FP8 E4M3 6.3. FHE&#x27;s exact-rounding rule does not transfer to long convolutions.">The noise rule for floating-point workloads</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-crest" title="The ratio of a signal&#x27;s peak to its RMS value. An ADC&#x27;s full scale must cover the peak, so a high crest factor wastes resolution on the rare large values: the noise rule&#x27;s error scales with it.">Crest factor</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-corr" title="For y = h ∗ u, the input gradient is G correlated with h, IFFT(G·conj(H)), and the filter gradient is G correlated with u, IFFT(G·conj(U)). A backward long convolution is one more FFT and two more Fourier-domain products than the forward; the analysis checks the formulas against direct sums and finite differences.">The gradient of a convolution is a correlation</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-masked" title="A Fourier-domain product whose second operand is a weight spectrum (forward H, backward conj(H)) can be a mask written once per optimizer step. One whose operands both depend on the sample (conj(U)·G for the weight gradient) needs a new mask for every sequence, and in practice stays digital.">Weight-masked and data-by-data products</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-maskrewrite" title="An inference engine writes its filter spectra once; a training engine must rewrite them after every optimizer step, for the forward and the backward pass. Processing the whole step layer by layer amortises each write over every sequence, but the frame budget still rivals the digital step time.">Mask rewrites per optimizer step</a><a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-transformengine" title="An optical MAC accelerates every matrix multiply (the simulator&#x27;s hypothetical optical part); a Fourier transform engine accelerates only FFT and convolution work and leaves matmuls to a digital part.">Transform engine against optical MAC</a></div>
     </div>
 </section>
 
@@ -880,7 +883,7 @@
         <tr><td><strong>Forward-only methods</strong></td><td>The hardware, from forward passes alone</td><td><a href="#slide-08">08</a></td></tr>
     </table>
     </div>
-    <p>The lesson for an LLM engine comes at the end (<a href="#slide-13">slide 13</a>): these methods matter for <strong>calibrating the engine's own parameters</strong>, not for training the LLM. The physics of meshes, SLMs and detectors is in <a href="https://brendanjameslynskey.github.io/FOptInf_01_Fourier_Optics_for_Engineers/">FOptInf 01</a> and is not repeated here.</p>
+    <p>The lesson for an LLM engine comes at the end (<a href="#slide-14">slide 14</a>): these methods matter for <strong>calibrating the engine's own parameters</strong>, not for training the LLM. The physics of meshes, SLMs and detectors is in <a href="https://brendanjameslynskey.github.io/FOptInf_01_Fourier_Optics_for_Engineers/">FOptInf 01</a> and is not repeated here.</p>
 </section>
 
 <section class="slide" id="slide-02">
@@ -897,7 +900,7 @@
         <tr><td><strong>Read-out</strong></td><td>Exact to the number format</td><td>An ADC at finite ENOB, plus noise</td></tr>
     </table>
     </div>
-    <p>Two kinds of error result, and they behave differently in training. <strong>Systematic</strong> error (the model is wrong) biases every gradient the same way; <strong>random</strong> error (read-out noise) mostly averages out over steps. The rest of the deck is about which method copes with which, and the experiment on <a href="#slide-11">slide 11</a> shows both.</p>
+    <p>Two kinds of error result, and they behave differently in training. <strong>Systematic</strong> error (the model is wrong) biases every gradient the same way; <strong>random</strong> error (read-out noise) mostly averages out over steps. The rest of the deck is about which method copes with which, and the experiment on <a href="#slide-12">slide 12</a> shows both.</p>
 </section>
 
 <section class="slide" id="slide-03">
@@ -916,7 +919,7 @@
     <p>It works when the model is good, and it is the only option for a passive, fabricated device. Its weakness is the <a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-realitygap">reality gap</a>: the trained parameters are optimal for the model, not for the hardware. Misalignment between layers, fabrication tolerance, material absorption and detector response all move the real device away from the model, and nothing in the training loop sees it.</p>
     <div class="callout">
         <div class="callout-label">The reality gap does not shrink with more training</div>
-        <p>In-silico training converges to the model's optimum. More steps, a better optimizer or a bigger batch only get closer to that point; the error from the mismatch stays. The only fixes are a better model or putting the hardware in the loop. The experiment on <a href="#slide-11">slide 11</a> shows the plateau.</p>
+        <p>In-silico training converges to the model's optimum. More steps, a better optimizer or a bigger batch only get closer to that point; the error from the mismatch stays. The only fixes are a better model or putting the hardware in the loop. The experiment on <a href="#slide-12">slide 12</a> shows the plateau.</p>
     </div>
 </section>
 
@@ -1015,7 +1018,7 @@
     </ul>
     <div class="callout">
         <div class="callout-label">When it breaks</div>
-        <p>For a linear filter the 90&deg; condition is per frequency: physics-aware training converges if the twin's phase error stays below 90&deg; at every frequency, and stalls or diverges where it does not. The experiment on <a href="#slide-11">slide 11</a> computes the worst phase error of its hidden distortion live; push the distortion until it passes 90&deg; and watch the physics-aware curve fail while the in-situ curve does not.</p>
+        <p>For a linear filter the 90&deg; condition is per frequency: physics-aware training converges if the twin's phase error stays below 90&deg; at every frequency, and stalls or diverges where it does not. The experiment on <a href="#slide-12">slide 12</a> computes the worst phase error of its hidden distortion live; push the distortion until it passes 90&deg; and watch the physics-aware curve fail while the in-situ curve does not.</p>
     </div>
 </section>
 
@@ -1074,14 +1077,100 @@
     </table>
     </div>
     <p>The same distinction appears in low-precision digital training: rounding every update to nearest loses updates smaller than half a step, a biased error, while stochastic rounding is zero-mean and keeps them in expectation (<a href="https://arxiv.org/abs/1502.02551">Gupta et al., ICML 2015, arXiv:1502.02551</a>). For analogue parameter writes, the same holds: an SLM pixel or heater with finite resolution silently drops updates below its step unless the master copy of the parameter is kept digitally.</p>
+    <p><strong>A real case.</strong> In the Compute in Transit experiment (a 15.8M-parameter GPT on TinyStories, 8 simulated workers), emulated analogue optics computed DeMo's fixed DCT band while error feedback removed the <em>exact</em> band. All six runs of that first design diverged, to final losses of 11.153&ndash;558.834 against 3.124 for the band computed exactly, and ENOB 12 ended worse than ENOB 6. The cause was bias: quantisation and clipping errors that repeated every step and were never fed back. Feeding back the band actually sent fixed it. The details are on the <a href="#slide-10">next slide</a>.</p>
     <div class="callout">
         <div class="callout-label">So, calibrate the bias; average the noise</div>
-        <p>Read-out noise sets a floor on what the deployed engine can deliver (the dashed line on <a href="#slide-11">slide 11</a>), but within a training loop it mostly washes out. Bias is what training on the wrong model cannot fix. Repeated passes cut random noise by &radic;k (<a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-averaging">averaging</a>) and do nothing for bias.</p>
+        <p>Read-out noise sets a floor on what the deployed engine can deliver (the dashed line on <a href="#slide-12">slide 12</a>), but within a training loop it mostly washes out. Bias is what training on the wrong model cannot fix. Repeated passes cut random noise by &radic;k (<a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-averaging">averaging</a>) and do nothing for bias.</p>
     </div>
 </section>
 
 <section class="slide" id="slide-10">
     <div class="slide-number">10</div>
+    <h2>A Measured Case: Optics Inside DeMo's Feedback Loop</h2>
+    <p>The Compute in Transit experiment (<a href="https://brendanjameslynskey.github.io/CiT_04_Fixed_Band_Experiment/">CiT 04</a>) put an emulated analogue transform inside a real training loop. It trained a 15.8M-parameter GPT (15,833,472 parameters, 8 layers, width 384) on TinyStories with 8 simulated workers for 3,000 steps, using DeMo (<a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Training/#g-demo">glossary</a>): each worker DCT-transforms its update in 256-point chunks and sends only a <strong>fixed frequency band</strong>, one coefficient in sixteen. Variant E computed that band with an emulated optical transform modelled on a photonic link module (Kundu et al., arXiv:2608.21536): each value quantised against a full scale into P binary <strong>bit planes</strong>, each plane through the transform with read-out noise at a given ENOB, the planes recombined. Variant C computed the same band exactly.</p>
+    <div class="canvas-wrap">
+        <svg viewBox="0 0 760 250" width="760" height="250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DeMo's error-feedback loop: the momentum plus the decaying residual forms the delta, the emulated optics extracts the band from it and the band is all-gathered; the next residual is the delta minus either the exact band (first design) or the band actually sent (the fix)">
+            <style>
+                .bx { fill: rgba(151,205,198,0.08); stroke: #97cdc6; }
+                .bo { fill: rgba(222,128,90,0.10); stroke: #de805a; }
+                .ar { stroke: #a2978b; stroke-width: 1.5; fill: none; marker-end: url(#ah10); }
+                .arf { stroke: #aabd59; stroke-width: 2; fill: none; marker-end: url(#ah10f); }
+                .arb { stroke: #de805a; stroke-width: 2; fill: none; stroke-dasharray: 6 4; marker-end: url(#ah10b); }
+                .t  { fill: #efe8dc; font-family: 'Geist Mono', monospace; font-size: 12px; }
+                .d  { fill: #a2978b; font-family: 'Geist Mono', monospace; font-size: 10px; }
+                .tf { fill: #aabd59; font-family: 'Geist Mono', monospace; font-size: 11px; }
+                .tb { fill: #de805a; font-family: 'Geist Mono', monospace; font-size: 11px; }
+            </style>
+            <defs>
+                <marker id="ah10" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#a2978b"/></marker>
+                <marker id="ah10f" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#aabd59"/></marker>
+                <marker id="ah10b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#de805a"/></marker>
+            </defs>
+            <rect x="15" y="40" width="120" height="40" rx="6" class="bx"/><text x="27" y="64" class="t">momentum m_t</text>
+            <path d="M135 60 L172 60" class="ar"/>
+            <circle cx="188" cy="60" r="14" class="bx"/><text x="183" y="65" class="t">+</text>
+            <path d="M202 60 L232 60" class="ar"/>
+            <rect x="236" y="40" width="70" height="40" rx="6" class="bx"/><text x="255" y="64" class="t">&Delta;_t</text>
+            <path d="M306 60 L326 60" class="ar"/>
+            <rect x="330" y="25" width="235" height="70" rx="6" class="bo"/>
+            <text x="342" y="45" class="t">emulated optics</text>
+            <text x="342" y="63" class="d">FS = &kappa;&middot;RMS(&Delta;), &kappa; = 4</text>
+            <text x="342" y="78" class="d">P bit planes, DCT band, ENOB noise</text>
+            <path d="M565 60 L596 60" class="ar"/>
+            <rect x="600" y="40" width="150" height="40" rx="6" class="bx"/><text x="610" y="58" class="t">b&#770;_t sent</text><text x="610" y="73" class="d">all-gather (own too)</text>
+            <path d="M271 80 L271 150" class="ar"/>
+            <rect x="120" y="154" width="300" height="44" rx="6" class="bx"/>
+            <text x="132" y="173" class="t">residual e_t+1 = &Delta;_t &minus; band</text>
+            <text x="132" y="189" class="d">kept, decaying &times;0.999 per step</text>
+            <path d="M160 154 L184 76" class="ar"/>
+            <text x="20" y="120" class="d">next step</text>
+            <path d="M705 80 L705 225 L420 225 L380 200" class="arf"/>
+            <text x="440" y="242" class="tf">fix: &minus; b&#770;_t (the band sent)</text>
+            <path d="M449 95 L449 130 L400 152" class="arb"/>
+            <text x="456" y="125" class="tb">first design: &minus; b_t (exact band)</text>
+        </svg>
+    </div>
+    <p><strong>Error feedback</strong> is what makes a compressed update work: the delta Δ<sub>t</sub> = m<sub>t</sub> + e<sub>t</sub> is the momentum plus everything not yet sent, the band is removed, and the rest stays in the residual, decaying only by 0.999 per step. DeMo then applies the <strong>sign</strong> of the update. The optics' input range was set as <strong>full scale = &kappa;&middot;RMS(&Delta;)</strong> with &kappa; = 4, measured over calibration steps 200&ndash;299 and then either held fixed or re-set every 100 steps from the delta's mean square. As first designed (full scale fixed, the <em>exact</em> band fed back), all six E runs diverged while C trained:</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>E run</th><th>First design: final loss (clip rate)</th><th>Band sent fed back: final loss (clip rate)</th></tr>
+        <tr><td>ENOB 6, 8 planes</td><td>11.153 (22.59%)</td><td>3.423 (0.28%)</td></tr>
+        <tr><td>ENOB 8, 8 planes</td><td>214.647 (45.80%)</td><td>3.017 (0.29%)</td></tr>
+        <tr><td>ENOB 10, 8 planes</td><td>42.183 (24.93%)</td><td>2.878 (0.30%)</td></tr>
+        <tr><td>ENOB 12, 8 planes</td><td>336.981 (57.50%)</td><td>2.905 (0.30%)</td></tr>
+        <tr><td>ENOB 8, 4 planes</td><td>344.388 (56.52%)</td><td>3.137 (0.22%)</td></tr>
+        <tr><td>ENOB 8, 12 planes</td><td>558.834 (54.57%)</td><td>3.024 (0.30%)</td></tr>
+        <tr><td>C, exact band (3 seeds)</td><td colspan="2">3.124 &plusmn; 0.008</td></tr>
+    </table>
+    </div>
+    <p class="src">Final validation loss at step 3,000, clip rate over the whole run; one seed per E run. Source: CiT experiment results.md &sect;1 and &sect;3, plotted on the <a href="https://compute-in-transit-results.vercel.app/optics#runs">results site</a>; the repaired runs re-set the full scale every 100 steps.</p>
+    <div class="diagram-grid cols-2">
+        <div class="diagram-panel accent-border">
+            <h4>Why it diverged</h4>
+            <ul>
+                <li><strong>Not noise:</strong> ENOB 12 ended worse than ENOB 6 (336.981 against 11.153), and 12 planes worse than 8.</li>
+                <li><strong>A stale full scale:</strong> the band is removed every step and the residual keeps growing, so the band's share of the delta's energy falls from 1.4&ndash;2.3&times;10<sup>&minus;3</sup> at step 200 to 1.6&ndash;1.8&times;10<sup>&minus;5</sup> at step 3,000. A full scale fixed at the end of calibration saturates: the clip rate jumped from about 1% (steps 300&ndash;400) to 35&ndash;51% (steps 400&ndash;600).</li>
+                <li><strong>A bias:</strong> the residual changes slowly, so quantisation and clipping errors repeat almost identically every step. The sender believed it had sent the exact band; every receiver applied the optics' version; the difference was never corrected. Because DeMo applies the sign, a consistent error moves every weight a full step the wrong way, step after step.</li>
+            </ul>
+        </div>
+        <div class="diagram-panel accent-border">
+            <h4>The fix</h4>
+            <ul>
+                <li><strong>Feed back the band actually sent.</strong> In an all-gather every worker receives every worker's values, its own included, so the sender sees what the optics produced, errors and all, and removes that from its delta (<a href="https://compute-in-transit-results.vercel.app/optics#loop">the loop</a>).</li>
+                <li>Every repaired run trains, final loss 2.878&ndash;3.423, with about 0.3% of inputs clipped.</li>
+                <li>Re-setting the full scale then adds nothing: 3.017 with it, 3.021 with it fixed (ENOB 8), where 1.34% clip but the clipping error is fed back like any other.</li>
+            </ul>
+        </div>
+    </div>
+    <p>The diagnosis was isolated on the CPU with TinyShakespeare runs (4 layers, width 128, 600 steps): the first design reached 8.809 against 2.464 for the exact band; re-setting the full scale with the exact band still fed back gave 3.404; removing the read-out noise entirely still left 2.967; feeding back the band sent gave 2.520&ndash;2.535. Quantisation and clipping errors that were never fed back were enough to break training. Source: CiT experiment <code>optics_investigation.md</code> &sect;1&ndash;4.</p>
+    <div class="callout">
+        <div class="callout-label">Bias, not noise</div>
+        <p>This is the &ldquo;biased, systematic&rdquo; row of <a href="#slide-09">slide 09</a>, measured: more ENOB did not help because the damage was a repeated error, not a random one. The cure was not better optics but closing the loop on what the optics actually did, the same lesson as hardware-in-the-loop training (<a href="#slide-06">slide 06</a>). Precision then matters again, on the <a href="#slide-11">next slide</a>.</p>
+    </div>
+</section>
+
+<section class="slide" id="slide-11">
+    <div class="slide-number">11</div>
     <h2>Precision for Training Formats</h2>
     <p>Mixed-precision LLM training keeps activations and weights in BF16 or FP8 E4M3 and gradients in FP8 E5M2, which trades mantissa bits for range (<a href="https://arxiv.org/abs/2209.05433">Micikevicius et al., &ldquo;FP8 formats for deep learning&rdquo;, arXiv:2209.05433</a>: E4M3 reaches 448, E5M2 57,344). An analogue engine in that loop need not be exact; its read-out should add no more error than the format's own rounding. The inference series' <a href="https://brendanjameslynskey.github.io/LLM_Hub_Fourier_Optics_Inference/#g-floatenob">noise rule</a>, relative error = crest &times; 2<sup>&minus;ENOB</sup> &times; 2/&radic;12, applied to a 4,096-sample long convolution and its two gradients:</p>
     <div class="table-wrap">
@@ -1099,10 +1188,35 @@
         <li><strong>Spiky gradients cost bits:</strong> the filter gradient's crest factor of 4.92 against 3.55 for the forward output adds about 0.4&ndash;0.5 ENOB at every format. Per-tensor scaling, as FP8 training uses, sets the range; it does not remove the outliers' claim on full scale.</li>
         <li><strong>Matching the format is the bar, not convergence:</strong> the experiment on the next slide trains to the same filter quality across a wide range of ENOB, because zero-mean noise averages out (<a href="#slide-09">slide 09</a>).</li>
     </ul>
+    <p><strong>Measured in a training loop.</strong> The repaired runs of <a href="#slide-10">slide 10</a> (band sent fed back, full scale re-set every 100 steps) show what ENOB and how many bit planes an LLM training loop needed, at one size: a 15.8M-parameter GPT on TinyStories, 8 simulated workers, one seed per optics run.</p>
+    <div class="table-wrap">
+    <table>
+        <tr><th>Run</th><th>Final loss</th><th>Steps to 3.158</th></tr>
+        <tr><td>ENOB 6, 8 planes</td><td>3.423</td><td>never</td></tr>
+        <tr><td>ENOB 8, 8 planes</td><td>3.017</td><td>1,800</td></tr>
+        <tr><td>ENOB 10, 8 planes</td><td>2.878</td><td>1,600</td></tr>
+        <tr><td>ENOB 12, 8 planes</td><td>2.905</td><td>1,800</td></tr>
+        <tr><td>ENOB 8, 4 planes</td><td>3.137</td><td>2,600</td></tr>
+        <tr><td>ENOB 8, 12 planes</td><td>3.024</td><td>2,000</td></tr>
+        <tr><td>Perfect optics (control: no quantisation, no noise)</td><td>3.141</td><td>2,800</td></tr>
+        <tr><td>C, exact band (3 seeds)</td><td>3.124 &plusmn; 0.008</td><td>2,667</td></tr>
+    </table>
+    </div>
+    <p class="src">Source: CiT experiment results.md &sect;1 (final loss; steps to 3.158, the 2-D fixed band's final loss, evaluated every 200 steps) and &sect;3; CiT simulation results.md &sect;7c. On the results site: <a href="https://compute-in-transit-results.vercel.app/optics#enob">ENOB and bit planes, repaired</a>.</p>
+    <ul>
+        <li><strong>Below ENOB 8 the noise costs loss:</strong> ENOB 6 ends at 3.423, 0.3 above the exact band, and never reaches 3.158. In the companion timing simulation, wherever a band-in-transit variant wins at all its break-even ENOB is 8, the lowest measured ENOB that trains (simulation results.md &sect;7c).</li>
+        <li><strong>Bit planes:</strong> each value is split into P binary planes, one optical pass each, recombined with weights 2<sup>b</sup>. Each plane's read-out noise is &sigma;<sub>plane</sub> = FS &middot; 2<sup>&minus;ENOB</sup> &middot; 2/&radic;12, and the recombination multiplies it: &sigma;<sub>value</sub> = &sigma;<sub>plane</sub> &middot; &radic;(&Sigma;<sub>b=0</sub><sup>P&minus;1</sup> 4<sup>b</sup>), a factor of 147.8 for 8 planes. Four planes cost about 0.12 loss against eight (3.137 against 3.017); twelve gain nothing (3.024), and each extra plane is another pass.</li>
+        <li><strong>The control:</strong> perfect optics ends at 3.141, 0.017 above the exact band's mean, so the different chunking E uses is not what moves the optics runs.</li>
+        <li><strong>Against the format-matching rule:</strong> the rule above asks about 10.3 ENOB to hide inside BF16 rounding, a bound on the error per value. In this loop, with errors fed back, convergence stopped improving from ENOB 8 and only ENOB 6 hurt. The two answer different questions, the rule for one long convolution, the measurement for one model, one seed per run; neither licenses the other's number at scale.</li>
+    </ul>
+    <div class="callout">
+        <div class="callout-label">Hypothesis, single seed</div>
+        <p>From ENOB 8 up, the repaired optics band ends <em>below</em> the exact band it emulates: 2.878 at ENOB 10 against 3.124 &plusmn; 0.008. A hypothesis from the experiment's notes, untested: quantisation and clipping are non-linear, so the values sent carry a little of the large out-of-band residual, and feeding them back lets some out-of-band information reach the model. Against it: every optics run is a single seed, and on TinyShakespeare the repaired optics ended slightly <em>above</em> the exact band (2.520&ndash;2.535 against 2.464) (<a href="https://compute-in-transit-results.vercel.app/optics#hypothesis">results site</a>). Either way it does not rescue the fixed band: the best optics run, 2.878, is still 1.09 above top-k's 1.785.</p>
+    </div>
 </section>
 
-<section class="slide" id="slide-11">
-    <div class="slide-number">11</div>
+<section class="slide" id="slide-12">
+    <div class="slide-number">12</div>
     <h2>Interactive: Three Trainers, One Distorted Filter</h2>
     <p>The &ldquo;hardware&rdquo; is a 1-D causal convolution with a hidden fixed distortion: a short kernel (equivalently a per-frequency gain and phase error) and a tanh saturation, read out with zero-mean noise at the chosen ENOB. The task: learn a 16-tap target filter by gradient descent. Three trainers see the same inputs:</p>
     <ul>
@@ -1310,8 +1424,8 @@
     </script>
 </section>
 
-<section class="slide" id="slide-12">
-    <div class="slide-number">12</div>
+<section class="slide" id="slide-13">
+    <div class="slide-number">13</div>
     <h2>The Methods Compared</h2>
     <div class="table-wrap">
     <table>
@@ -1327,8 +1441,8 @@
     <p>Two axes separate them: <strong>how much of the gradient comes from the real device</strong> (in-silico none, physics-aware the error only, in-situ and forward-only all of it), and <strong>whether the learning rule is still backpropagation</strong> (DFA and local learning change it). Only methods that keep backpropagation and take the gradient from the device remove both the reality gap and the algorithm risk; they are also the ones that ask the most of the hardware.</p>
 </section>
 
-<section class="slide" id="slide-13">
-    <div class="slide-number">13</div>
+<section class="slide" id="slide-14">
+    <div class="slide-number">14</div>
     <h2>What Maps onto an LLM-Scale Transform Engine</h2>
     <p>The engine of deck 01 computes fixed transforms (FFTs and Fourier-domain products) on values it is handed. The LLM's weights, master copies and optimizer stay digital; a weight spectrum is written to the mask once per step and read back by nothing. So the training methods in this deck are <strong>not</strong> a way to train the LLM. They matter for the engine's <strong>own</strong> parameters: the transfer function of its lenses, mask pixels and detectors.</p>
     <div class="diagram-grid cols-2">
@@ -1337,7 +1451,7 @@
             <ul>
                 <li><strong>Calibration is training.</strong> Fitting a correction so the engine computes the transform the digital code assumes is a small in-loop training problem: probe inputs, measured outputs, a fitted correction.</li>
                 <li><strong>Hardware in the loop beats a model.</strong> Characterise the engine on the engine (in-situ or physics-aware style), not only from its design (in-silico), or the reality gap appears as a bias in every forward and backward pass.</li>
-                <li><strong>Bias versus noise.</strong> Calibrate gain, phase, offset and saturation; tolerate zero-mean read-out noise at the format's ENOB (<a href="#slide-10">slide 10</a>).</li>
+                <li><strong>Bias versus noise.</strong> Calibrate gain, phase, offset and saturation; tolerate zero-mean read-out noise at the format's ENOB (<a href="#slide-11">slide 11</a>). Where the engine sits inside an error-feedback loop, feed back what it actually produced (<a href="#slide-10">slide 10</a>).</li>
                 <li><strong>Drift.</strong> Recalibration has to run during a long training job, between optimizer steps.</li>
             </ul>
         </div>
@@ -1356,13 +1470,14 @@
     </div>
 </section>
 
-<section class="slide" id="slide-14">
-    <div class="slide-number">14</div>
+<section class="slide" id="slide-15">
+    <div class="slide-number">15</div>
     <h2>What to Take Away</h2>
     <ul>
         <li><strong>Optics has parameters of its own, and no exact model.</strong> Every training method for optical hardware is an answer to &ldquo;who computes the gradient&rdquo;: a model (in-silico), the device by interference (in-situ, the adjoint method), a twin fed real outputs (physics-aware), a fixed random projection (DFA), or forward passes alone.</li>
         <li><strong>In-silico training leaves a reality gap</strong> that no amount of training closes; any method with the hardware in the loop closes some or all of it. In the live experiment, in-silico plateaus wherever the distortion is non-zero.</li>
         <li><strong>Physics-aware training is cheap and robust</strong> until the twin's gradient points more than 90&deg; from the truth; in-situ measurement has no such limit but asks for adjoint injection and monitors at every parameter.</li>
+        <li><strong>Measured: bias, not noise, broke training.</strong> Emulated optics inside DeMo's error-feedback loop (a 15.8M-parameter GPT on TinyStories, 8 simulated workers) diverged in all six first-design runs, ENOB 12 worse than ENOB 6, because errors repeated every step and were never fed back; feeding back the band actually sent fixed it, and from ENOB 8 the runs ended at or below the exact band, on single seeds (<a href="#slide-10">slide 10</a>, <a href="#slide-11">slide 11</a>).</li>
         <li><strong>Calibrate bias, average noise.</strong> Zero-mean read-out noise washes out in a training loop; systematic error does not. The deployed engine still needs the format's ENOB: about 5.3&ndash;5.8 for FP8 E5M2 gradients, 6.3&ndash;6.7 for E4M3, 10.3&ndash;10.7 for BF16 (results.md &sect;5).</li>
         <li><strong>For an LLM-scale transform engine</strong> these methods calibrate the engine; they do not train the LLM, whose weights and optimizer stay digital.</li>
         <li><strong>Next:</strong> <a href="https://brendanjameslynskey.github.io/FOptTrn_03_Optical_Training_Clusters/">deck 03, Optical Engines in a Training Cluster</a>, places an engine in data-, tensor- and pipeline-parallel training: step time against mask-rewrite time, layer-major scheduling, and DeMo's frequency-domain gradient compression.</li>
